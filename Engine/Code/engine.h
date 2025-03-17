@@ -5,7 +5,10 @@
 #pragma once
 
 #include "platform.h"
+#include "BufferManagement.h"
+
 #include <glad/glad.h>
+
 
 typedef glm::vec2  vec2;
 typedef glm::vec3  vec3;
@@ -13,6 +16,15 @@ typedef glm::vec4  vec4;
 typedef glm::ivec2 ivec2;
 typedef glm::ivec3 ivec3;
 typedef glm::ivec4 ivec4;
+
+
+std::vector<Texture> textures;
+std::vector<Material> materials;
+std::vector<Mesh> meshes;
+std::vector<Model> models;
+std::vector<Program> programs;
+
+
 
 struct Image
 {
@@ -28,12 +40,27 @@ struct Texture
     std::string filepath;
 };
 
+
+struct VertexShaderAttribute
+{
+    u8 location;
+    u8 componentCount;
+ 
+};
+
+struct VertexShaderLayout
+{
+    std::vector<VertexShaderAttribute> attributes;
+    
+};
+
 struct Program
 {
     GLuint             handle;
     std::string        filepath;
     std::string        programName;
     u64                lastWriteTimestamp; // What is this for?
+    VertexShaderLayout vertexInputLayout;
 };
 
 enum Mode
@@ -42,6 +69,18 @@ enum Mode
     Mode_Count
 };
 
+struct VertexV3V2
+{
+    glm::vec3 pos;
+    glm::vec2 uv;
+};
+
+const VertexV3V2 vertices[] = {
+    {glm::vec3(-0.5,-0.5,0.0), glm::vec2(0.0,0.0)},
+    {glm::vec3(0.5,-0.5,0.0), glm::vec2(1.0,0.0)},
+    {glm::vec3(0.5,0.5,0.0), glm::vec2(1.0,1.0)},
+    {glm::vec3(-0.5,0.5,0.0), glm::vec2(0.0,01.0)},
+}
 struct App
 {
     // Loop
@@ -75,7 +114,7 @@ struct App
 
     // Embedded geometry (in-editor simple meshes such as
     // a screen filling quad, a cube, a sphere...)
-    GLuint embeddedVertices;
+    BufferquadVertexBuffer;
     GLuint embeddedElements;
 
     // Location of the texture uniform in the textured quad shader
@@ -93,3 +132,4 @@ void Update(App* app);
 
 void Render(App* app);
 
+void CleanUp(

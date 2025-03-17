@@ -199,6 +199,31 @@ int main()
 
     GlobalFrameArenaMemory = (u8*)malloc(GLOBAL_FRAME_ARENA_SIZE);
 
+    std::stringstream VendorInfo;
+
+    VendorInfo << "OpenGL version:" << std::endl;
+    VendorInfo << glGetString(GL_VERSION) << std::endl << std::endl;
+
+    VendorInfo << "OpenGL renderer:" << std::endl;
+    VendorInfo << glGetString(GL_RENDERER) << std::endl << std::endl;
+
+    VendorInfo << "OpenGL vendor:" << std::endl;
+    VendorInfo << glGetString(GL_VENDOR) << std::endl << std::endl;
+
+    VendorInfo << "OpenGL GLSL version:" << std::endl;
+    VendorInfo << glGetString(GL_SHADING_LENGUAGE_VERSION) << std::endl << std::endl;
+
+    VendorInfo << "OpenGL extension:" << std::endl;
+    GLint num_extensions;
+    glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
+    for (size_t i = 0; i < num_extensions; ++i)
+    {
+        VendorInfo << glGetStringi(GL_EXTENSIONS, GLuint(i)) << " ";
+    }
+    VendorInfo << std::endl;
+
+    app.mOpenGLInfo = VendorInfo.str();
+
     Init(&app);
 
     while (app.isRunning)
@@ -261,6 +286,7 @@ int main()
         // Reset frame allocator
         GlobalFrameArenaHead = 0;
     }
+    Cleanup(&app);
 
     free(GlobalFrameArenaMemory);
 
