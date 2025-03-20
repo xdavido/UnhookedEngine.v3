@@ -206,7 +206,7 @@ int main()
 
     GlobalFrameArenaMemory = (u8*)malloc(GLOBAL_FRAME_ARENA_SIZE);
 
-   /* std::stringstream VendorInfo;
+    std::stringstream VendorInfo;
 
     VendorInfo << "OpenGL version:" << std::endl;
     VendorInfo << glGetString(GL_VERSION) << std::endl << std::endl;
@@ -229,7 +229,7 @@ int main()
     }
     VendorInfo << std::endl;
 
-    app.mOpenGLInfo = VendorInfo.str();*/
+    app.mOpenGLInfo = VendorInfo.str();
 
     Init(&app);
 

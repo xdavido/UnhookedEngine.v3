@@ -2,6 +2,13 @@
 #define C_BUFFER_MANAGEMENT
 
 #include "Structs.h"
+#include <stdint.h>  // For uint32_t (u32)
+#include <string.h>  // For memcpy
+#include <glad/glad.h>
+
+// Type definitions
+typedef uint32_t u32;
+typedef uint8_t u8;
 
 bool IsPowerOf2(u32 value);
 

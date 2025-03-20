@@ -12,24 +12,18 @@
 #include <stb_image.h>
 #include <stb_image_write.h>
 
-#include <vector>
-#include <iostream>
+glm::mat4 TransformScale(const vec3& scaleFactors)
+{
+    glm::mat4 transform = scale(scaleFactors);
+    return transform;
+}
 
-
-const VertexV3V2 vertices[] = {
-
-    {   glm::vec3(-0.5,-0.5,0.0), glm::vec2(0.0,0.0)    },  //Bottom-left verex
-    {   glm::vec3(0.5,-0.5,0.0),  glm::vec2(1.0,0.0)    },  //Bottom-Right vertex
-    {   glm::vec3(0.5,0.5,0.0),   glm::vec2(1.0,1.0)    },  //Top_Right vertex
-    {   glm::vec3(-0.5,0.5,0.0),  glm::vec2(0.0,1.0)    },  //Top_Left vertex
-};
-
-const u16 indices[] = {
-
-    0, 1, 2,
-    0, 2, 3
-};
-
+glm::mat4 TransformPositionScale(const vec3& pos, const vec3& scaleFactor)
+{
+    glm::mat4 transform = translate(pos);
+    transform = scale(transform, scaleFactor);
+    return transform;
+}
 
 GLuint CreateProgramFromSource(String programSource, const char* shaderName)
 {
@@ -51,10 +45,10 @@ GLuint CreateProgramFromSource(String programSource, const char* shaderName)
         programSource.str
     };
     const GLint vertexShaderLengths[] = {
-        (GLint) strlen(versionString),
-        (GLint) strlen(shaderNameDefine),
-        (GLint) strlen(vertexShaderDefine),
-        (GLint) programSource.len
+        (GLint)strlen(versionString),
+        (GLint)strlen(shaderNameDefine),
+        (GLint)strlen(vertexShaderDefine),
+        (GLint)programSource.len
     };
     const GLchar* fragmentShaderSource[] = {
         versionString,
@@ -63,10 +57,10 @@ GLuint CreateProgramFromSource(String programSource, const char* shaderName)
         programSource.str
     };
     const GLint fragmentShaderLengths[] = {
-        (GLint) strlen(versionString),
-        (GLint) strlen(shaderNameDefine),
-        (GLint) strlen(fragmentShaderDefine),
-        (GLint) programSource.len
+        (GLint)strlen(versionString),
+        (GLint)strlen(shaderNameDefine),
+        (GLint)strlen(fragmentShaderDefine),
+        (GLint)programSource.len
     };
 
     GLuint vshader = glCreateShader(GL_VERTEX_SHADER);
@@ -160,14 +154,14 @@ Image LoadImage(const char* filename)
 GLuint CreateTexture2DFromImage(Image image)
 {
     GLenum internalFormat = GL_RGB8;
-    GLenum dataFormat     = GL_RGB;
-    GLenum dataType       = GL_UNSIGNED_BYTE;
+    GLenum dataFormat = GL_RGB;
+    GLenum dataType = GL_UNSIGNED_BYTE;
 
     switch (image.nchannels)
     {
-        case 3: dataFormat = GL_RGB; internalFormat = GL_RGB8; break;
-        case 4: dataFormat = GL_RGBA; internalFormat = GL_RGBA8; break;
-        default: ELOG("LoadTexture2D() - Unsupported number of channels");
+    case 3: dataFormat = GL_RGB; internalFormat = GL_RGB8; break;
+    case 4: dataFormat = GL_RGBA; internalFormat = GL_RGBA8; break;
+    default: ELOG("LoadTexture2D() - Unsupported number of channels");
     }
 
     GLuint texHandle;
@@ -183,6 +177,11 @@ GLuint CreateTexture2DFromImage(Image image)
     glBindTexture(GL_TEXTURE_2D, 0);
 
     return texHandle;
+}
+
+void FreeImage(Image image)
+{
+    stbi_image_free(image.pixels);
 }
 
 u32 LoadTexture2D(App* app, const char* filepath)
@@ -210,83 +209,65 @@ u32 LoadTexture2D(App* app, const char* filepath)
         return UINT32_MAX;
     }
 }
-void FreeImage(Image image)
-{
-    stbi_image_free(image.pixels);
-}
+
 
 
 void Init(App* app)
 {
-    
-        // TODO: Initialize your resources here!
-        // - vertex buffers
 
-        glEnable(GL_DEPTH_TEST);
+    // TODO: Initialize your resources here!
+    // - vertex buffers
+
+    glEnable(GL_DEPTH_TEST);
+
+    app->quadVertexBuffer = CreateStaticIndexBuffer(sizeof(vertices));
+
+    glBindBuffer(GL_ARRAY_BUFFER, app->quadVertexBuffer.handle);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glGenBuffers(1, &app->embeddedElements);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, app->embeddedElements);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+    glGenVertexArrays(1, &app->vao);
+    glBindVertexArray(app->vao);
+    glBindBuffer(GL_ARRAY_BUFFER, app->quadVertexBuffer.handle);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexV3V2), (void*)0);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VertexV3V2), (void*)12);
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, app->embeddedElements);
+    glBindVertexArray(0);
 
 
-        app->quadVertexBuffer = CreateStaticIndexBuffer(sizeof(vertices));
+    //Geometry Rendering loads
+    app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", "RENDER_QUAD");
 
-        glBindBuffer(GL_ARRAY_BUFFER, app->quadVertexBuffer.handle);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
 
-        glGenBuffers(1, &app->embeddedElements);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, app->embeddedElements);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    app->diceTexIdx = LoadTexture2D(app, "dice.png");
+    app->whiteTexIdx = LoadTexture2D(app, "color_white.png");
+    app->blackTexIdx = LoadTexture2D(app, "color_black.png");
+    app->normalTexIdx = LoadTexture2D(app, "color_normal.png");
+    app->magentaTexIdx = LoadTexture2D(app, "color_magenta.png");
 
-        glGenVertexArrays(1, &app->vao);
-        glBindVertexArray(app->vao);
-        glBindBuffer(GL_ARRAY_BUFFER, app->quadVertexBuffer.handle);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexV3V2), (void*)0);
-       
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VertexV3V2), (void*)12);
-        glEnableVertexAttribArray(1);
-        glBindBuffer(GL_ARRAY_BUFFER, app->embeddedElements);
-        glBindVertexArray(0);
-         
-        
-        //Geometry Rendering loads
-        app->texturedGeometryProgramIdx = LoadProgram(app, "./RENDER_QUAD.glsl", "RENDER_QUAD");
-       
-        app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
+    //Geometry Rendering loads
 
-        app->diceTexIdx = LoadTexture2D(app, "dice.png");
-        app->whiteTexIdx = LoadTexture2D(app, "color_white.png");
-        app->blackTexIdx = LoadTexture2D(app, "color_black.png");
-        app->normalTexIdx = LoadTexture2D(app, "color_normal.png");
-        app->magentaTexIdx = LoadTexture2D(app, "color_magenta.png");
+    app->ModelIdx = LoadModel(app, "Queen/Queen.obj");
+    app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY");
+    app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
 
-        //Geometry Rendering loads
-        app->patrickIdx = LoadModel(app, "./Patrick.obj");
-        app->geometryProgramIdx = LoadProgram(app, "./RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY");
-        app->patrickTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
-
-        app->mode = Mode_Forward_Geometry;
+    app->mode = Mode_Forward_Geometry;
 }
 
 void Gui(App* app)
 {
     ImGui::Begin("Info");
-    ImGui::Text("FPS: %f", 1.0f/app->deltaTime);
-   // ImGui::TextWrapped("%s", app->mOpenGLInfo.c_str());
-    ImGui::Text("OpenGL Version: %s", glGetString(GL_VERSION));
-    ImGui::Text("OpenGL Renderer: %s", glGetString(GL_RENDERER));
-    ImGui::Text("OpenGL Vendor: %s", glGetString(GL_VENDOR));
-    ImGui::Text("OpenGL GLSL Version: %s", glGetString(GL_SHADING_LANGUAGE_VERSION));
-
-    // Display OpenGL extensions
-    ImGui::Separator();
-    ImGui::Text("OpenGL Extensions:");
-    GLint num_extensions;
-    glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
-    for (int i = 0; i < num_extensions; ++i) {
-        const unsigned char* extension = glGetStringi(GL_EXTENSIONS, GLuint(i));
-        ImGui::Text("%s", extension);
-    }
-    // End the ImGui window
+    ImGui::Text("FPS: %f", 1.0f / app->deltaTime);
+    ImGui::TextWrapped("%s", app->mOpenGLInfo.c_str());
     ImGui::End();
 }
 
@@ -335,7 +316,7 @@ void Render(App* app)
             Program& geometryProgram = app->programs[app->geometryProgramIdx];
             glUseProgram(geometryProgram.handle);
 
-            Model& model = app->models[app->patrickIdx];
+            Model& model = app->models[app->ModelIdx];
             Mesh& mesh = app->meshes[model.meshIdx];
 
             for (size_t i = 0; i < mesh.submeshes.size(); ++i)
@@ -349,7 +330,7 @@ void Render(App* app)
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
 
-                glUniform1i(app->patrickTextureUniform, 0);
+                glUniform1i(app->ModelTextureUniform, 0);
 
                 SubMesh& submesh = mesh.submeshes[i];
                 glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
@@ -357,24 +338,24 @@ void Render(App* app)
             break;
         }
 
-        default:;
+      default:;
     }
 }
 
 void CleanUp(App* app)
 {
     ELOG("Cleaning up engine");
-  
+
     for (auto& texture : app->textures)
     {
         glDeleteTextures(1, &texture.handle);
     };
-   
+
     for (auto& program : app->programs)
     {
         program.handle = 0;
     };
-   
+
 
     if (app->vao != 0)
     {
@@ -393,11 +374,11 @@ void CleanUp(App* app)
     }
 
 
- }
+}
 
 GLuint FindVAO(Mesh& mesh, u32 submeshIndex, const Program& program)
 {
-   
+
 
     SubMesh& submesh = mesh.submeshes[submeshIndex];
 
@@ -410,7 +391,7 @@ GLuint FindVAO(Mesh& mesh, u32 submeshIndex, const Program& program)
 
     // Create a new vao for this submesh/program
     GLuint vaoHandle;
-    
+
 
     glGenVertexArrays(1, &vaoHandle);
     glBindVertexArray(vaoHandle);
@@ -443,7 +424,6 @@ GLuint FindVAO(Mesh& mesh, u32 submeshIndex, const Program& program)
     }
 
     glBindVertexArray(0);
-   
 
     // Almacenar el nuevo VAO en la lista para este submesh
     Vao vao = { vaoHandle, program.handle };

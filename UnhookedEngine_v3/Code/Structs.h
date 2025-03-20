@@ -1,7 +1,7 @@
-#ifndef C_STRUCTS_H
-#define C_STRUCTS_H
+#ifndef STRUCTS
+#define STRUCTS
 
-#include "engine.h"
+#include"platform.h"
 #include <glad/glad.h>    
 
 typedef glm::vec2  vec2;
@@ -12,12 +12,11 @@ typedef glm::ivec3 ivec3;
 typedef glm::ivec4 ivec4;
 
 
-struct Buffer
-{
+struct Buffer {
     u32 size;
     GLenum type;
     GLuint handle;
-    u64 head;
+    u32 head;
     u8* data;
 };
 
@@ -31,22 +30,17 @@ struct Image
 
 struct Texture
 {
-    GLuint  handle;
+    GLuint      handle;
     std::string filepath;
 };
 
-
-struct VertexShaderAttribute
-{
+struct VertexShaderAttribute {
     u8 location;
     u8 componentCount;
-
 };
 
-struct VertexShaderLayout
-{
+struct VertexShaderLayout {
     std::vector<VertexShaderAttribute> attributes;
-
 };
 
 struct Program
@@ -58,7 +52,6 @@ struct Program
     VertexShaderLayout vertexInputLayout;
 };
 
-
 enum Mode
 {
     Mode_Textured_Geometry,
@@ -66,32 +59,41 @@ enum Mode
     Mode_Count
 };
 
-
 struct VertexV3V2
 {
     glm::vec3 pos;
     glm::vec2 uv;
 };
 
+const VertexV3V2 vertices[] = {
 
-struct VertexBufferAttribute
-{
-	u8 location;
-	u8 componentCount;
-	u8 offset;
+    {   glm::vec3(-0.5,-0.5,0.0), glm::vec2(0.0,0.0)    },  //Bottom-left verex
+    {   glm::vec3(0.5,-0.5,0.0),  glm::vec2(1.0,0.0)    },  //Bottom-Right vertex
+    {   glm::vec3(0.5,0.5,0.0),   glm::vec2(1.0,1.0)    },  //Top_Right vertex
+    {   glm::vec3(-0.5,0.5,0.0),  glm::vec2(0.0,1.0)    },  //Top_Left vertex
 };
 
-struct VertexBufferLayout
-{
-	std::vector< VertexBufferAttribute> attributes;
-	u8 stride;
+const u16 indices[] = {
+
+    0, 1, 2,
+    0, 2, 3
 };
 
 
-struct Model
-{
-	u32 meshIdx;
-	std::vector<u32> materialIdx;
+struct VertexBufferAttribute {
+    u8 location;
+    u8 componentCount;
+    u8 offset;
+};
+
+struct VertexBufferLayout {
+    std::vector<VertexBufferAttribute> attributes;
+    u8 stride;
+};
+
+struct Model {
+    u32 meshIdx;
+    std::vector<u32> materialIdx;
 };
 
 struct Vao
@@ -99,36 +101,32 @@ struct Vao
     GLuint handle;
     GLuint programHandle;
 };
-struct SubMesh
-{
+
+struct SubMesh {
     VertexBufferLayout vertexBufferLayout;
     std::vector<float> vertices;
     std::vector<u32> indices;
     u32 vertexOffset;
     u32 indexOffset;
     std::vector<Vao> vaos;
-
 };
 
-struct Mesh
-{
+struct Mesh {
     std::vector<SubMesh> submeshes;
     GLuint vertexBufferHandle;
     GLuint indexBufferHandle;
 };
 
-struct Material
-{
-	std::string name;
-	vec3 albedo;
-	vec3 emissive;
-	f32 smoothness;
-	u32 albedoTextureIdx;
-	u32 emissiveTextureIdx;
-	u32 specularTextureIdx;
-	u32 normalsTextureIdx;
-	u32 bumpTextureIdx;
-
+struct Material {
+    std::string name;
+    vec3 albedo;
+    vec3 emissive;
+    f32 smoothness;
+    u32 albedoTextureIdx;
+    u32 emissiveTextureIdx;
+    u32 specularTextureIdx;
+    u32 normalsTextureIdx;
+    u32 bumpTextureIdx;
 };
 
 struct App
@@ -143,27 +141,27 @@ struct App
     // Graphics
     char gpuName[64];
     char openGlVersion[64];
+
     std::string mOpenGLInfo;
 
     ivec2 displaySize;
 
     std::vector<Texture>  textures;
+    std::vector<Material>  materials;
+    std::vector<Mesh>  meshes;
+    std::vector<Model>  models;
     std::vector<Program>  programs;
-    std::vector<Material> materials;
-    std::vector<Mesh> meshes;
-    std::vector<Model> models;
 
-
-    // Location of the texture uniform in the textured quad shader
-    GLuint programUniformTexture;
 
     // program indices
     u32 texturedGeometryProgramIdx;
-
     u32 geometryProgramIdx;
-    u32 patrickIdx;
-    u32 patrickTextureUniform;
-    
+
+    //Modelo 3D cargado
+    u32 ModelIdx;
+    u32 ModelTextureUniform;
+
+
     // texture indices
     u32 diceTexIdx;
     u32 whiteTexIdx;
@@ -179,9 +177,12 @@ struct App
     Buffer quadVertexBuffer;
     GLuint embeddedElements;
 
+    // Location of the texture uniform in the textured quad shader
+    GLuint programUniformTexture;
+
     // VAO object to link our screen filling quad with our textured quad shader
     GLuint vao;
 };
 
 
-#endif
+#endif // !STRUCTS

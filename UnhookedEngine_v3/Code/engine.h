@@ -1,9 +1,9 @@
 #pragma once
 
 #include "platform.h"
-#include "Structs.h"
-#include "BufferManagement.h"
 #include "ModelLoader.h"
+#include "BufferManagement.h"
+#include "Structs.h"
 
 #include <glad/glad.h>
 
@@ -22,4 +22,6 @@ GLuint FindVAO(Mesh& mesh, u32 submeshIndex, const Program& program);
 
 u32 LoadTexture2D(App* app, const char* filepath);
 
+glm::mat4 TransformScale(const vec3& scaleFactors);
 
+glm::mat4 TransformPositionScale(const vec3& pos, const vec3& scaleFactor);
