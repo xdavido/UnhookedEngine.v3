@@ -1,19 +1,7 @@
 #ifndef C_BUFFER_MANAGEMENT
 #define C_BUFFER_MANAGEMENT
 
-#include "platform.h"
-
-#include <glad/glad.h>
-
-struct Buffer
-{
-    u32 size;
-    GLenum type;
-    GLuint handle;
-    u64 head
-        u8* data;
-};
-
+#include "Structs.h"
 
 bool IsPowerOf2(u32 value);
 
@@ -40,3 +28,5 @@ void PushAlignedData(Buffer& buffer, const void* data, u32 size, u32 alignment);
 #define PushVec4(buffer, value) PushAlignedData(buffer, value_ptr(value), sizeof(value), sizeof(vec4))
 #define PushMat3(buffer, value) PushAlignedData(buffer, value_ptr(value), sizeof(value), sizeof(vec4))
 #define PushMat4(buffer, value) PushAlignedData(buffer, value_ptr(value), sizeof(value), sizeof(vec4))
+
+#endif

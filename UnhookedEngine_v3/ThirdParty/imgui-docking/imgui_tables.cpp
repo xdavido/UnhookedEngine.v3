@@ -3323,7 +3323,8 @@ void ImGui::TableSettingsInstallHandler(ImGuiContext* context)
 // - TableGcCompactSettings() [Internal]
 //-------------------------------------------------------------------------
 
-// Remove Table (currently only used by TestEngine)
+// Remove Table (currently only used by Test
+// )
 void ImGui::TableRemove(ImGuiTable* table)
 {
     //IMGUI_DEBUG_LOG("TableRemove() id=0x%08X\n", table->ID);

@@ -79,7 +79,7 @@ void ProcessAssimpMesh(const aiScene* scene, aiMesh* mesh, Mesh* myMesh, u32 bas
     }
 
     // add the submesh into the mesh
-    Submesh submesh = {};
+    SubMesh submesh = {};
     submesh.vertexBufferLayout = vertexBufferLayout;
     submesh.vertices.swap(vertices);
     submesh.indices.swap(indices);
@@ -242,3 +242,4 @@ u32 LoadModel(App* app, const char* filename)
 
     return modelIdx;
 }
+

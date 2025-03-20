@@ -4,7 +4,7 @@
     <Filter Include="ImGui">
       <UniqueIdentifier>{8b6860e2-41a5-4e53-a253-6fa785cb8bfe}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Engine">
+    <Filter Include="UnhookedEngine_v3">
       <UniqueIdentifier>{f9a9780f-cc91-4f43-81f2-a71f14f8528a}</UniqueIdentifier>
     </Filter>
     <Filter Include="Glad">
@@ -43,19 +43,19 @@
       <Filter>Glad</Filter>
     </ClCompile>
     <ClCompile Include="Code\engine.cpp">
-      <Filter>Engine</Filter>
+      <Filter>UnhookedEngine_v3</Filter>
     </ClCompile>
     <ClCompile Include="Code\platform.cpp">
-      <Filter>Engine</Filter>
+      <Filter>UnhookedEngine_v3</Filter>
     </ClCompile>
     <ClCompile Include="ThirdParty\stb\stb.cpp">
       <Filter>Stb</Filter>
     </ClCompile>
-    <ClCompile Include="BufferManagement.cpp">
-      <Filter>Engine</Filter>
+    <ClCompile Include="Code\BufferManagement.cpp">
+      <Filter>UnhookedEngine_v3</Filter>
     </ClCompile>
-    <ClCompile Include="ModelLoader.cpp">
-      <Filter>Engine</Filter>
+    <ClCompile Include="Code\ModelLoader.cpp">
+      <Filter>UnhookedEngine_v3</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -84,7 +84,7 @@
       <Filter>ImGui</Filter>
     </ClInclude>
     <ClInclude Include="Code\engine.h">
-      <Filter>Engine</Filter>
+      <Filter>UnhookedEngine_v3</Filter>
     </ClInclude>
     <ClInclude Include="ThirdParty\glad\include\glad\glad.h">
       <Filter>Glad</Filter>
@@ -93,16 +93,19 @@
       <Filter>Glad</Filter>
     </ClInclude>
     <ClInclude Include="Code\platform.h">
-      <Filter>Engine</Filter>
+      <Filter>UnhookedEngine_v3</Filter>
     </ClInclude>
     <ClInclude Include="ThirdParty\stb\stb_image.h">
       <Filter>Stb</Filter>
     </ClInclude>
-    <ClInclude Include="BufferManagement.h">
-      <Filter>Engine</Filter>
+    <ClInclude Include="Code\BufferManagement.h">
+      <Filter>UnhookedEngine_v3</Filter>
     </ClInclude>
-    <ClInclude Include="ModelLoader.h">
-      <Filter>Engine</Filter>
+    <ClInclude Include="Code\ModelLoader.h">
+      <Filter>UnhookedEngine_v3</Filter>
+    </ClInclude>
+    <ClInclude Include="Code\Structs.h">
+      <Filter>UnhookedEngine_v3</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

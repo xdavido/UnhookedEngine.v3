@@ -9,6 +9,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define _CRT_SECURE_NO_WARNINGS
 #include <Windows.h>
+
 #else
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -17,13 +18,18 @@
 
 #include "engine.h"
 
+#include <string>       // std::string
+#include <iostream>     // std::cout
+#include <sstream>
+#include "string"
+
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
-#define WINDOW_TITLE  "Advanced Graphics Programming"
+#define WINDOW_TITLE  "UnhookedEngine_V3"
 #define WINDOW_WIDTH  800
 #define WINDOW_HEIGHT 600
 
@@ -129,8 +135,9 @@ int main()
         return -1;
     }
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    //Init OpenGL
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4); //Versio de OpenGL en 4.6
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
@@ -199,7 +206,7 @@ int main()
 
     GlobalFrameArenaMemory = (u8*)malloc(GLOBAL_FRAME_ARENA_SIZE);
 
-    std::stringstream VendorInfo;
+   /* std::stringstream VendorInfo;
 
     VendorInfo << "OpenGL version:" << std::endl;
     VendorInfo << glGetString(GL_VERSION) << std::endl << std::endl;
@@ -211,7 +218,7 @@ int main()
     VendorInfo << glGetString(GL_VENDOR) << std::endl << std::endl;
 
     VendorInfo << "OpenGL GLSL version:" << std::endl;
-    VendorInfo << glGetString(GL_SHADING_LENGUAGE_VERSION) << std::endl << std::endl;
+    VendorInfo << glGetString(GL_VERSION) << std::endl << std::endl;
 
     VendorInfo << "OpenGL extension:" << std::endl;
     GLint num_extensions;
@@ -222,7 +229,7 @@ int main()
     }
     VendorInfo << std::endl;
 
-    app.mOpenGLInfo = VendorInfo.str();
+    app.mOpenGLInfo = VendorInfo.str();*/
 
     Init(&app);
 
@@ -286,7 +293,8 @@ int main()
         // Reset frame allocator
         GlobalFrameArenaHead = 0;
     }
-    Cleanup(&app);
+
+    CleanUp(&app);
 
     free(GlobalFrameArenaMemory);
 

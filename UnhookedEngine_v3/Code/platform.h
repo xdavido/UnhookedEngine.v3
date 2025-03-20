@@ -1,8 +1,3 @@
-//
-// platform.h : This file contains basic platform types and tools. Also, it exposes
-// the necessary functions for the Engine to communicate with the Platform layer.
-//
-
 #pragma once
 
 #define _CRT_SECURE_NO_WARNINGS
@@ -13,6 +8,7 @@
 #include <glm/gtx/transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <vector>
+#include <iostream>
 #include <string>
 
 #pragma warning(disable : 4267) // conversion from X to Y, possible loss of data
@@ -62,6 +58,7 @@ struct String
     char* str;
     u32   len;
 };
+
 
 String MakeString(const char *cstr);
 
