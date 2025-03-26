@@ -214,10 +214,7 @@ u32 LoadTexture2D(App* app, const char* filepath)
 
 void Init(App* app)
 {
-
     // TODO: Initialize your resources here!
-    // - vertex buffers
-
     glEnable(GL_DEPTH_TEST);
 
     app->quadVertexBuffer = CreateStaticIndexBuffer(sizeof(vertices));
@@ -259,6 +256,57 @@ void Init(App* app)
     app->ModelIdx = LoadModel(app, "Queen/Queen.obj");
     app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY");
     app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
+
+    //Class06
+
+    float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
+    float near = 0.1f;
+    float far = 1000.0f;
+    app->worldCamera.ProjectionMatrix = glm::perspective(glm::radians(60.f), aspectRatio, near, far);
+    app->worldCamera.Position = vec3(0, 5, 10);
+    app->worldCamera.ViewMatrix = glm::lookAt(app->worldCamera.Position, vec3(0, 2, 0), vec3(0, 1, 0));
+    
+    glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &app->maxUniformBufferSize);
+    glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &app->uniformBlockAligment);
+
+    app->globalUBO = CreateConstantBuffer(app->maxUniformBufferSize);
+    app->entityUBO = CreateConstantBuffer(app->maxUniformBufferSize);
+
+    MapBuffer(app->globalUBO, GL_WRITE_ONLY);
+    PushVec3(app->globalUBO, app->worldCamera.Position);
+    UnmapBuffer(app->globalUBO);
+     
+    Buffer& entityUBO = app->entityUBO;
+
+    MapBuffer(entityUBO, GL_WRITE_ONLY);
+    glm::mat4 VP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
+
+    std::vector<glm::vec3> positions = {
+     {0, 0, 1},   // Entidad central al frente
+     {-3, 0, -3}, // Entidad izquierda atrás
+     {3, 0, -3}   // Entidad derecha atrás
+    };
+
+    for (const auto& pos : positions)
+    {
+        Entity entity;
+
+        AlignHead(entityUBO, app->uniformBlockAligment);
+        entity.entityBufferOffset = entityUBO.head;
+
+        entity.worldMatrix = glm::translate(pos);
+        entity.modelIndex = app->ModelIdx;
+
+        PushMat4(entityUBO, entity.worldMatrix);
+        PushMat4(entityUBO, VP * entity.worldMatrix);
+
+        entity.entityBufferSize = entityUBO.head - entity.entityBufferOffset;
+
+        app->entities.push_back(entity);
+    }
+
+
+    UnmapBuffer(entityUBO);
 
     app->mode = Mode_Forward_Geometry;
 }
@@ -313,29 +361,40 @@ void Render(App* app)
             glClearColor(0.0, 0.0, 0.0, 0.0);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+            glViewport(0, 0, app->displaySize.x, app->displaySize.y);
+
             Program& geometryProgram = app->programs[app->geometryProgramIdx];
             glUseProgram(geometryProgram.handle);
 
-            Model& model = app->models[app->ModelIdx];
-            Mesh& mesh = app->meshes[model.meshIdx];
+            glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
 
-            for (size_t i = 0; i < mesh.submeshes.size(); ++i)
+            for (const auto& entity : app->entities)
             {
-                GLuint vao = FindVAO(mesh, i, geometryProgram);
-                glBindVertexArray(vao);
+                glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
+                Model& model = app->models[entity.modelIndex];
+                Mesh& mesh = app->meshes[model.meshIdx];
 
-                u32 submeshMaterialIdx = model.materialIdx[i];
-                Material& submeshMaterial = app->materials[submeshMaterialIdx];
+                for (size_t i = 0; i < mesh.submeshes.size(); ++i)
+                {
+                    GLuint vao = FindVAO(mesh, i, geometryProgram);
+                    glBindVertexArray(vao);
 
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
+                    u32 submeshMaterialIdx = model.materialIdx[i];
+                    Material& submeshMaterial = app->materials[submeshMaterialIdx];
 
-                glUniform1i(app->ModelTextureUniform, 0);
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
 
-                SubMesh& submesh = mesh.submeshes[i];
-                glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+                    glUniform1i(app->ModelTextureUniform, 0);
+
+                    SubMesh& submesh = mesh.submeshes[i];
+                    glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                }
             }
-            break;
+
+        break;
         }
 
       default:;
@@ -378,8 +437,6 @@ void CleanUp(App* app)
 
 GLuint FindVAO(Mesh& mesh, u32 submeshIndex, const Program& program)
 {
-
-
     SubMesh& submesh = mesh.submeshes[submeshIndex];
 
     // Try finding a vao for this submesh/program

@@ -11,6 +11,11 @@ typedef glm::ivec2 ivec2;
 typedef glm::ivec3 ivec3;
 typedef glm::ivec4 ivec4;
 
+struct Camera {
+    glm::mat4 ViewMatrix;
+    glm::mat4 ProjectionMatrix;
+    glm::vec3 Position;
+};
 
 struct Buffer {
     u32 size;
@@ -129,6 +134,14 @@ struct Material {
     u32 bumpTextureIdx;
 };
 
+struct Entity {
+
+    glm::mat4 worldMatrix;
+    u32 modelIndex;
+    u32 entityBufferSize;
+    u32 entityBufferOffset;
+
+};
 struct App
 {
     // Loop
@@ -182,6 +195,14 @@ struct App
 
     // VAO object to link our screen filling quad with our textured quad shader
     GLuint vao;
+
+    Camera worldCamera;
+    GLint maxUniformBufferSize;
+    GLint uniformBlockAligment;
+
+    Buffer entityUBO;
+    Buffer globalUBO;
+    std::vector<Entity> entities;
 };
 
 
