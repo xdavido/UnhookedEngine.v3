@@ -14,6 +14,8 @@ void Gui(App* app);
 
 void Update(App* app);
 
+void UpdateLights(App* app);
+
 void Render(App* app);
 
 void CleanUp(App* app);
@@ -25,3 +27,5 @@ u32 LoadTexture2D(App* app, const char* filepath);
 glm::mat4 TransformScale(const vec3& scaleFactors);
 
 glm::mat4 TransformPositionScale(const vec3& pos, const vec3& scaleFactor);
+
+void CreateEntity(App* app, const u32 aModelIdx, const glm::mat4& aVP, const glm::vec3& aPos);

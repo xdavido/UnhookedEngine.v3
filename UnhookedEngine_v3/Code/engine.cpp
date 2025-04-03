@@ -25,6 +25,24 @@ glm::mat4 TransformPositionScale(const vec3& pos, const vec3& scaleFactor)
     return transform;
 }
 
+void CreateEntity(App* app, const u32 aModelIdx, const glm::mat4& aVP, const glm::vec3& aPos)
+{
+    Entity entity;
+
+    AlignHead(app->entityUBO, app->uniformBlockAligment);
+    entity.entityBufferOffset = app->entityUBO.head;
+
+    entity.worldMatrix = glm::translate(aPos);
+    entity.modelIndex = aModelIdx;
+
+    PushMat4(app->entityUBO, entity.worldMatrix);
+    PushMat4(app->entityUBO, aVP * entity.worldMatrix);
+
+    entity.entityBufferSize = app->entityUBO.head - entity.entityBufferOffset;
+
+    app->entities.push_back(entity);
+}
+
 GLuint CreateProgramFromSource(String programSource, const char* shaderName)
 {
     GLchar  infoLogBuffer[1024] = {};
@@ -254,16 +272,18 @@ void Init(App* app)
     //Geometry Rendering loads
 
     app->ModelIdx = LoadModel(app, "Queen/Queen.obj");
+    u32 planeIdx = LoadModel(app, "Plane/Plane.obj");
+
     app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY");
     app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
 
     //Class06
-
+  
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
     float near = 0.1f;
     float far = 1000.0f;
     app->worldCamera.ProjectionMatrix = glm::perspective(glm::radians(60.f), aspectRatio, near, far);
-    app->worldCamera.Position = vec3(0, 5, 10);
+    app->worldCamera.Position = vec3(0, 7, 20);
     app->worldCamera.ViewMatrix = glm::lookAt(app->worldCamera.Position, vec3(0, 2, 0), vec3(0, 1, 0));
     
     glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &app->maxUniformBufferSize);
@@ -272,15 +292,20 @@ void Init(App* app)
     app->globalUBO = CreateConstantBuffer(app->maxUniformBufferSize);
     app->entityUBO = CreateConstantBuffer(app->maxUniformBufferSize);
 
-    MapBuffer(app->globalUBO, GL_WRITE_ONLY);
-    PushVec3(app->globalUBO, app->worldCamera.Position);
-    UnmapBuffer(app->globalUBO);
-     
-    Buffer& entityUBO = app->entityUBO;
+    //Lights
+    app->lights.push_back({ LightType::Light_Directional, vec3(0.5), vec3(-1,-1,1),vec3(0)});
+    app->lights.push_back({ LightType::Light_Point, vec3(1,0.6,0.6), vec3(0),vec3(-4,8,0) });
+    UpdateLights(app);
 
+    //Entities Buffer
+    Buffer& entityUBO = app->entityUBO;
     MapBuffer(entityUBO, GL_WRITE_ONLY);
     glm::mat4 VP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
 
+    //Geometry Plane
+    CreateEntity(app, planeIdx, VP, vec3(0));
+
+    //Geometry Queen
     std::vector<glm::vec3> positions = {
      {0, 0, 1},   // Entidad central al frente
      {-3, 0, -3}, // Entidad izquierda atrás
@@ -289,20 +314,8 @@ void Init(App* app)
 
     for (const auto& pos : positions)
     {
-        Entity entity;
+        CreateEntity(app, app->ModelIdx, VP, pos);
 
-        AlignHead(entityUBO, app->uniformBlockAligment);
-        entity.entityBufferOffset = entityUBO.head;
-
-        entity.worldMatrix = glm::translate(pos);
-        entity.modelIndex = app->ModelIdx;
-
-        PushMat4(entityUBO, entity.worldMatrix);
-        PushMat4(entityUBO, VP * entity.worldMatrix);
-
-        entity.entityBufferSize = entityUBO.head - entity.entityBufferOffset;
-
-        app->entities.push_back(entity);
     }
 
 
@@ -313,15 +326,84 @@ void Init(App* app)
 
 void Gui(App* app)
 {
-    ImGui::Begin("Info");
+    ImGui::Begin("Unhooked.v3 Parameters");
     ImGui::Text("FPS: %f", 1.0f / app->deltaTime);
-    ImGui::TextWrapped("%s", app->mOpenGLInfo.c_str());
+
+    if (ImGui::CollapsingHeader("OpenGL Info"))
+    {
+        ImGui::TextWrapped("%s", app->mOpenGLInfo.c_str());
+    }
+
+    ImGui::Separator();
+
+    bool lightChanged = false;
+    if (ImGui::CollapsingHeader("Lights"))
+    {
+      
+        for (auto& light : app->lights)
+        {
+            vec3 checkVector;
+            ImGui::PushID(&light);
+            float color[3] = { light.color.x, light.color.y, light.color.z };
+            ImGui::DragFloat3("Color", color, 0.01, 0.0, 1.0);
+            checkVector = vec3(color[0], color[1], color[2]);
+            if (checkVector != light.color)
+            {
+                light.color = checkVector;
+                lightChanged = true;
+            }
+
+            float direction[3] = { light.direction.x, light.direction.y, light.direction.z };
+            ImGui::DragFloat3("Direction", direction, 0.01, -1.0, 1.0);
+            checkVector = vec3(direction[0], direction[1], direction[2]);
+            if (checkVector != light.direction)
+            {
+                light.direction = checkVector;
+                lightChanged = true;
+            }
+
+            float position[3] = { light.position.x, light.position.y, light.position.z };
+            ImGui::DragFloat3("Position", position);
+            checkVector = vec3(position[0], position[1], position[2]);
+            if (checkVector != light.position)
+            {
+                light.position = checkVector;
+                lightChanged = true;
+            }
+            ImGui::PopID();
+            ImGui::Separator();
+
+            if (lightChanged)
+            {
+                UpdateLights(app);
+            }
+        }
+    }
+
     ImGui::End();
 }
 
 void Update(App* app)
 {
     // You can handle app->input keyboard/mouse here
+}
+
+void UpdateLights(App* app)
+{
+    MapBuffer(app->globalUBO, GL_WRITE_ONLY);
+    PushVec3(app->globalUBO, app->worldCamera.Position);
+    PushUInt(app->globalUBO, app->lights.size());
+    for (size_t i = 0; i < app->lights.size(); i++)
+    {
+        AlignHead(app->globalUBO, sizeof(vec4));
+        Light& light = app->lights[i];
+        PushUInt(app->globalUBO, static_cast<unsigned int>(light.type));
+        PushVec3(app->globalUBO, light.color);
+        PushVec3(app->globalUBO, light.direction);
+        PushVec3(app->globalUBO, light.position);
+
+    }
+    UnmapBuffer(app->globalUBO);
 }
 
 void Render(App* app)

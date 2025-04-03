@@ -30,8 +30,8 @@
 #include <imgui_impl_opengl3.h>
 
 #define WINDOW_TITLE  "UnhookedEngine_V3"
-#define WINDOW_WIDTH  800
-#define WINDOW_HEIGHT 600
+#define WINDOW_WIDTH  1600
+#define WINDOW_HEIGHT 900
 
 #define GLOBAL_FRAME_ARENA_SIZE MB(16)
 u8* GlobalFrameArenaMemory = NULL;
@@ -114,6 +114,8 @@ void OnGlfwResizeFramebuffer(GLFWwindow* window, int width, int height)
     app->displaySize = vec2(width, height);
 }
 
+
+
 void OnGlfwCloseWindow(GLFWwindow* window)
 {
     App* app = (App*)glfwGetWindowUserPointer(window);
@@ -141,7 +143,18 @@ int main()
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, NULL, NULL);
+    // Obtener el tamaño de la pantalla
+    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+    GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Unhooked.v3", nullptr, nullptr);
+
+
+    // Crear una ventana sin bordes, pero con el tamaño de la pantalla
+    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);  // Mantiene los marcos
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); // Evita que se deforme por el usuario
+
+    
+
     if (!window)
     {
         ELOG("glfwCreateWindow() failed\n");

@@ -142,6 +142,22 @@ struct Entity {
     u32 entityBufferOffset;
 
 };
+
+enum LightType
+{
+    Light_Directional,
+    Light_Point,
+
+};
+struct Light
+{
+    LightType type;
+    vec3 color;
+    vec3 direction;
+    vec3 position;
+};
+
+
 struct App
 {
     // Loop
@@ -202,7 +218,9 @@ struct App
 
     Buffer entityUBO;
     Buffer globalUBO;
+
     std::vector<Entity> entities;
+    std::vector<Light> lights;
 };
 
 
