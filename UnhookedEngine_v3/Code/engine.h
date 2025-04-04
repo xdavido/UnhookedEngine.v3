@@ -29,3 +29,5 @@ glm::mat4 TransformScale(const vec3& scaleFactors);
 glm::mat4 TransformPositionScale(const vec3& pos, const vec3& scaleFactor);
 
 void CreateEntity(App* app, const u32 aModelIdx, const glm::mat4& aVP, const glm::vec3& aPos);
+
+void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO);

@@ -228,7 +228,41 @@ u32 LoadTexture2D(App* app, const char* filepath)
     }
 }
 
+void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClearColor(0.0, 0.0, 0.0, 0.0);
 
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glViewport(0, 0, app->displaySize.x, app->displaySize.y);
+
+    Program& programTexturedGeometry = app->programs[app->texturedGeometryProgramIdx];
+    glUseProgram(programTexturedGeometry.handle);
+
+    glBindVertexArray(app->vao);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
+
+    size_t iteration = 0;
+    const char* uniformNames[] = { "uAlbedo", "uNormals", "uPosition", "uViewDir" };
+    for (const auto& texture : aFBO.attachments)
+    {
+        GLint uniformPosition = glGetUniformLocation(programTexturedGeometry.handle, uniformNames[iteration]);
+        
+        //glUniform1i(uniformPosition, iteration);
+        glActiveTexture(GL_TEXTURE0 + iteration);
+        glBindTexture(GL_TEXTURE_2D, texture.second);
+        ++iteration;
+    }
+
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
 
 void Init(App* app)
 {
@@ -248,19 +282,20 @@ void Init(App* app)
 
     glGenVertexArrays(1, &app->vao);
     glBindVertexArray(app->vao);
-    glBindBuffer(GL_ARRAY_BUFFER, app->quadVertexBuffer.handle);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, app->quadVertexBuffer.handle);   
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexV3V2), (void*)0);
-
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VertexV3V2), (void*)12);
     glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ARRAY_BUFFER, app->embeddedElements);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, app->embeddedElements);
+
     glBindVertexArray(0);
 
 
     //Geometry Rendering loads
-    app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", "RENDER_QUAD");
-
+    app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", "RENDER_QUAD_DEFERRED");
     app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
 
     app->diceTexIdx = LoadTexture2D(app, "dice.png");
@@ -274,7 +309,7 @@ void Init(App* app)
     app->ModelIdx = LoadModel(app, "Queen/Queen.obj");
     u32 planeIdx = LoadModel(app, "Plane/Plane.obj");
 
-    app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY");
+    app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY_DEFERRED");
     app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
 
     //Class06
@@ -295,6 +330,8 @@ void Init(App* app)
     //Lights
     app->lights.push_back({ LightType::Light_Directional, vec3(0.5), vec3(-1,-1,1),vec3(0)});
     app->lights.push_back({ LightType::Light_Point, vec3(1,0.6,0.6), vec3(0),vec3(-4,8,0) });
+    app->lights.push_back({ LightType::Light_Point, vec3(1,0.8,0.6), vec3(0),vec3(5,1,0) });
+
     UpdateLights(app);
 
     //Entities Buffer
@@ -317,68 +354,76 @@ void Init(App* app)
         CreateEntity(app, app->ModelIdx, VP, pos);
 
     }
-
-
     UnmapBuffer(entityUBO);
 
-    app->mode = Mode_Forward_Geometry;
+    app->mode = Mode_Deferred_Geometry;
+    
+    if (!app->primaryFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y)) {
+        ELOG("Failed to create FBO");
+        return;
+    }
+
 }
 
 void Gui(App* app)
 {
+
     ImGui::Begin("Unhooked.v3 Parameters");
-    ImGui::Text("FPS: %f", 1.0f / app->deltaTime);
 
-    if (ImGui::CollapsingHeader("OpenGL Info"))
-    {
-        ImGui::TextWrapped("%s", app->mOpenGLInfo.c_str());
-    }
+        ImGui::Text("FPS: %f", 1.0f / app->deltaTime);
+        //displaySize = ImGui::GetContentRegionAvail();;
 
-    ImGui::Separator();
-
-    bool lightChanged = false;
-    if (ImGui::CollapsingHeader("Lights"))
-    {
-      
-        for (auto& light : app->lights)
+        if (ImGui::CollapsingHeader("OpenGL Info"))
         {
-            vec3 checkVector;
-            ImGui::PushID(&light);
-            float color[3] = { light.color.x, light.color.y, light.color.z };
-            ImGui::DragFloat3("Color", color, 0.01, 0.0, 1.0);
-            checkVector = vec3(color[0], color[1], color[2]);
-            if (checkVector != light.color)
-            {
-                light.color = checkVector;
-                lightChanged = true;
-            }
+            ImGui::TextWrapped("%s", app->mOpenGLInfo.c_str());
+        }
 
-            float direction[3] = { light.direction.x, light.direction.y, light.direction.z };
-            ImGui::DragFloat3("Direction", direction, 0.01, -1.0, 1.0);
-            checkVector = vec3(direction[0], direction[1], direction[2]);
-            if (checkVector != light.direction)
-            {
-                light.direction = checkVector;
-                lightChanged = true;
-            }
+        ImGui::Separator();
 
-            float position[3] = { light.position.x, light.position.y, light.position.z };
-            ImGui::DragFloat3("Position", position);
-            checkVector = vec3(position[0], position[1], position[2]);
-            if (checkVector != light.position)
-            {
-                light.position = checkVector;
-                lightChanged = true;
-            }
-            ImGui::PopID();
-            ImGui::Separator();
+        bool lightChanged = false;
+        if (ImGui::CollapsingHeader("Lights"))
+        {
 
-            if (lightChanged)
+            for (auto& light : app->lights)
             {
-                UpdateLights(app);
+                vec3 checkVector;
+                ImGui::PushID(&light);
+                float color[3] = { light.color.x, light.color.y, light.color.z };
+                ImGui::DragFloat3("Color", color, 0.01, 0.0, 1.0);
+                checkVector = vec3(color[0], color[1], color[2]);
+                if (checkVector != light.color)
+                {
+                    light.color = checkVector;
+                    lightChanged = true;
+                }
+
+                float direction[3] = { light.direction.x, light.direction.y, light.direction.z };
+                ImGui::DragFloat3("Direction", direction, 0.01, -1.0, 1.0);
+                checkVector = vec3(direction[0], direction[1], direction[2]);
+                if (checkVector != light.direction)
+                {
+                    light.direction = checkVector;
+                    lightChanged = true;
+                }
+
+                float position[3] = { light.position.x, light.position.y, light.position.z };
+                ImGui::DragFloat3("Position", position);
+                checkVector = vec3(position[0], position[1], position[2]);
+                if (checkVector != light.position)
+                {
+                    light.position = checkVector;
+                    lightChanged = true;
+                }
+                ImGui::PopID();
+                ImGui::Separator();
+
+                if (lightChanged)
+                {
+                    UpdateLights(app);
+                }
             }
         }
-    }
+    
 
     ImGui::End();
 }
@@ -436,8 +481,10 @@ void Render(App* app)
             glBindVertexArray(0);
             glUseProgram(0);
 
-            break;
+            
         }
+        break;
+
         case Mode_Forward_Geometry:
         {
             glClearColor(0.0, 0.0, 0.0, 0.0);
@@ -476,8 +523,65 @@ void Render(App* app)
                 }
             }
 
-        break;
+            
         }
+        break;
+
+        case Mode_Deferred_Geometry:
+        {
+            glClearColor(0.0, 0.0, 0.0, 0.0);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            
+            glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
+            std::vector<GLuint> textures;
+            for (auto& it : app->primaryFBO.attachments)
+            {
+                textures.push_back(it.second);
+            }
+            glDrawBuffers(textures.size(), textures.data());
+
+            glClearColor(0.0, 0.0, 0.0, 0.0);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            glViewport(0, 0, app->displaySize.x, app->displaySize.y);
+
+            Program& geometryProgram = app->programs[app->geometryProgramIdx];
+            glUseProgram(geometryProgram.handle);
+
+            glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
+
+            for (const auto& entity : app->entities)
+            {
+                glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
+                Model& model = app->models[entity.modelIndex];
+                Mesh& mesh = app->meshes[model.meshIdx];
+
+                for (size_t i = 0; i < mesh.submeshes.size(); ++i)
+                {
+                    GLuint vao = FindVAO(mesh, i, geometryProgram);
+                    glBindVertexArray(vao);
+
+                    u32 submeshMaterialIdx = model.materialIdx[i];
+                    Material& submeshMaterial = app->materials[submeshMaterialIdx];
+
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
+
+                    glUniform1i(app->ModelTextureUniform, 0);
+
+                    SubMesh& submesh = mesh.submeshes[i];
+                    glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                }
+            }
+            glUseProgram(0);
+            glBindFramebuffer(GL_FRAMEBUFFER,0);
+
+            RenderScreenFillQuad(app, app->primaryFBO);
+           
+        }
+        break;
 
       default:;
     }
