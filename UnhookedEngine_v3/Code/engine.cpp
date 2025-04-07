@@ -252,9 +252,9 @@ void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO)
     {
         GLint uniformPosition = glGetUniformLocation(programTexturedGeometry.handle, uniformNames[iteration]);
         
-        //glUniform1i(uniformPosition, iteration);
         glActiveTexture(GL_TEXTURE0 + iteration);
         glBindTexture(GL_TEXTURE_2D, texture.second);
+        glUniform1i(uniformPosition, iteration);
         ++iteration;
     }
 
@@ -306,6 +306,7 @@ void Init(App* app)
 
     //Geometry Rendering loads
 
+    //app->ModelIdx = LoadModel(app, "Patrick/Patrick.obj");
     app->ModelIdx = LoadModel(app, "Queen/Queen.obj");
     u32 planeIdx = LoadModel(app, "Plane/Plane.obj");
 
