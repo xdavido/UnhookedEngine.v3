@@ -12,6 +12,8 @@ void Init(App* app);
 
 void Gui(App* app);
 
+void UpdateEntities(App* app);
+
 void Update(App* app);
 
 void UpdateLights(App* app);
@@ -31,3 +33,4 @@ glm::mat4 TransformPositionScale(const vec3& pos, const vec3& scaleFactor);
 void CreateEntity(App* app, const u32 aModelIdx, const glm::mat4& aVP, const glm::vec3& aPos);
 
 void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO);
+

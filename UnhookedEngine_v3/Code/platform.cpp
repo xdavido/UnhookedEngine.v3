@@ -30,8 +30,8 @@
 #include <imgui_impl_opengl3.h>
 
 #define WINDOW_TITLE  "UnhookedEngine_V3"
-#define WINDOW_WIDTH  1600
-#define WINDOW_HEIGHT 900
+#define WINDOW_WIDTH  1920
+#define WINDOW_HEIGHT 1080
 
 #define GLOBAL_FRAME_ARENA_SIZE MB(16)
 u8* GlobalFrameArenaMemory = NULL;
@@ -94,6 +94,7 @@ void OnGlfwKeyboardEvent(GLFWwindow* window, int key, int scancode, int action, 
         case GLFW_KEY_Y: key = K_Y; break; case GLFW_KEY_Z: key = K_Z; break;
         case GLFW_KEY_ESCAPE: key = K_ESCAPE; break;
         case GLFW_KEY_ENTER:  key = K_ENTER; break;
+        case GLFW_KEY_LEFT_SHIFT:  key = K_LEFT_SHIFT; break;
     }
 
     App* app = (App*)glfwGetWindowUserPointer(window);
@@ -112,8 +113,8 @@ void OnGlfwResizeFramebuffer(GLFWwindow* window, int width, int height)
 {
     App* app = (App*)glfwGetWindowUserPointer(window);
     app->displaySize = vec2(width, height);
-}
 
+}
 
 
 void OnGlfwCloseWindow(GLFWwindow* window)
@@ -145,15 +146,11 @@ int main()
 
     // Obtener el tamaño de la pantalla
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-    GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Unhooked.v3", nullptr, nullptr);
-
+    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Unhooked.v3", nullptr, nullptr);
 
     // Crear una ventana sin bordes, pero con el tamaño de la pantalla
-    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);  // Mantiene los marcos
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); // Evita que se deforme por el usuario
-
-    
+    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);    // Mantiene bordes
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); ; // Evita que se deforme por el usuario
 
     if (!window)
     {
@@ -172,6 +169,10 @@ int main()
     glfwSetWindowCloseCallback(window, OnGlfwCloseWindow);
 
     glfwMakeContextCurrent(window);
+    
+    //glfwGetFramebufferSize(window, WINDOW_WIDTH, WINDOW_HEIGHT);
+    OnGlfwResizeFramebuffer(window, WINDOW_WIDTH, WINDOW_HEIGHT);
+
 
     // Load all OpenGL functions using the glfw loader function
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
@@ -192,8 +193,8 @@ int main()
     //io.ConfigViewportsNoTaskBarIcon = true;
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsClassic();
+    //ImGui::StyleColorsDark();
+    ImGui::StyleColorsClassic();
 
     // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
     ImGuiStyle& style = ImGui::GetStyle();

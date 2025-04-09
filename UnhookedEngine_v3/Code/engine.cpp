@@ -25,6 +25,7 @@ glm::mat4 TransformPositionScale(const vec3& pos, const vec3& scaleFactor)
     return transform;
 }
 
+
 void CreateEntity(App* app, const u32 aModelIdx, const glm::mat4& aVP, const glm::vec3& aPos)
 {
     Entity entity;
@@ -320,7 +321,10 @@ void Init(App* app)
     float far = 1000.0f;
     app->worldCamera.ProjectionMatrix = glm::perspective(glm::radians(60.f), aspectRatio, near, far);
     app->worldCamera.Position = vec3(0, 7, 20);
-    app->worldCamera.ViewMatrix = glm::lookAt(app->worldCamera.Position, vec3(0, 2, 0), vec3(0, 1, 0));
+    app->worldCamera.Front = glm::vec3(0.0f, -0.3f, -1.0f); // Apuntando ligeramente hacia abajo
+    app->worldCamera.ViewMatrix = glm::lookAt(app->worldCamera.Position, app->worldCamera.Position + app->worldCamera.Front, app->worldCamera.Up);
+    
+    glm::mat4 VP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
     
     glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &app->maxUniformBufferSize);
     glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &app->uniformBlockAligment);
@@ -329,32 +333,34 @@ void Init(App* app)
     app->entityUBO = CreateConstantBuffer(app->maxUniformBufferSize);
 
     //Lights
-    app->lights.push_back({ LightType::Light_Directional, vec3(0.7,1.0,0.5), vec3(-1,-0.25,0),vec3(0)});
-    app->lights.push_back({ LightType::Light_Point, vec3(1,0.6,0.6), vec3(0),vec3({0, 0.5, 1}) });
-    app->lights.push_back({ LightType::Light_Point, vec3(1,0.8,0.6), vec3(0),vec3(-3, 0.5, -5) });
+    app->lights.push_back({ LightType::Light_Directional, vec3(0.2), vec3(-1,-0.25,0),vec3(0)});
+    app->lights.push_back({ LightType::Light_Point, vec3(1,0.5,0.5), vec3(0),vec3({0, 8.5, 1}) });
+    app->lights.push_back({ LightType::Light_Point, vec3(0.5,0.5,1), vec3(0),vec3(-5, 8.5, -3) });
+    app->lights.push_back({ LightType::Light_Point, vec3(0.5,1,0.5), vec3(0),vec3(5, 8.5, -3) });
+    app->lights.push_back({ LightType::Light_Point, vec3(0.5,0.5,0), vec3(0),vec3(0, 8.5, -7) });
 
     UpdateLights(app);
 
     //Entities Buffer
     Buffer& entityUBO = app->entityUBO;
     MapBuffer(entityUBO, GL_WRITE_ONLY);
-    glm::mat4 VP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
 
-    //Geometry Plane
-    CreateEntity(app, planeIdx, VP, vec3(0));
-
-    //Geometry Queen
     std::vector<glm::vec3> positions = {
-     {0, 0, 1},   // Entidad central al frente
-     {-3, 0, -3}, // Entidad izquierda atrás
-     {3, 0, -3}   // Entidad derecha atrás
+     {0, 0, 0},   // Entidad central al frente
+     {-5, 0, -3}, // Entidad izquierda atrás
+     {5, 0, -3},  // Entidad derecha atrás
+     {0, 0, -7},   // Entidad central al frente
     };
 
+    //Geometry Plane
+    CreateEntity(app, planeIdx, VP, positions[0]);
+
+    //Geometry Queens
     for (const auto& pos : positions)
     {
-        CreateEntity(app, app->ModelIdx, VP, pos);
-
+      CreateEntity(app, app->ModelIdx, VP, pos);
     }
+
     UnmapBuffer(entityUBO);
 
     app->mode = Mode_Deferred_Geometry;
@@ -372,7 +378,6 @@ void Gui(App* app)
     ImGui::Begin("Unhooked.v3 Parameters");
 
         ImGui::Text("FPS: %f", 1.0f / app->deltaTime);
-        //displaySize = ImGui::GetContentRegionAvail();;
 
         if (ImGui::CollapsingHeader("OpenGL Info"))
         {
@@ -429,10 +434,91 @@ void Gui(App* app)
     ImGui::End();
 }
 
+
+void UpdateEntities(App* app)
+{
+    glm::mat4 VP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
+    MapBuffer(app->entityUBO, GL_WRITE_ONLY);
+
+    for (auto& entity : app->entities)
+    {
+        glm::mat4* vpOffset = (glm::mat4*)((u8*)app->entityUBO.data + entity.entityBufferOffset + sizeof(glm::mat4));
+        *vpOffset = VP * entity.worldMatrix;
+    }
+
+    UnmapBuffer(app->entityUBO);
+}
+
+
 void Update(App* app)
 {
-    // You can handle app->input keyboard/mouse here
+    // Store previous camera position to detect movement
+    glm::vec3 prevPosition = app->worldCamera.Position;
+    glm::vec3 prevFront = app->worldCamera.Front;
+
+    // Tiempo entre frames para movimiento suave
+    float deltaTime = app->deltaTime;
+
+    // Aumentar velocidad si Shift está presionado
+    float speedMultiplier = 1.0f;
+    if (app->input.keys[Key::K_LEFT_SHIFT] == ButtonState::BUTTON_PRESSED)
+    {
+        speedMultiplier = 3.0f; // Puedes ajustar este valor para más o menos velocidad extra
+    }
+
+    float velocity = app->cameraSpeed * deltaTime * speedMultiplier;
+
+    if (app->input.keys[Key::K_W] == ButtonState::BUTTON_PRESSED)
+        app->worldCamera.Position += app->worldCamera.Front * velocity;
+    if (app->input.keys[Key::K_S] == ButtonState::BUTTON_PRESSED)
+        app->worldCamera.Position -= app->worldCamera.Front * velocity;
+    if (app->input.keys[Key::K_A] == ButtonState::BUTTON_PRESSED)
+        app->worldCamera.Position -= app->worldCamera.Right * velocity;
+    if (app->input.keys[Key::K_D] == ButtonState::BUTTON_PRESSED)
+        app->worldCamera.Position += app->worldCamera.Right * velocity;
+    if (app->input.keys[Key::K_E] == ButtonState::BUTTON_PRESSED)
+        app->worldCamera.Position += app->worldCamera.Up * velocity;
+    if (app->input.keys[Key::K_Q] == ButtonState::BUTTON_PRESSED)
+        app->worldCamera.Position -= app->worldCamera.Up * velocity;
+    // Mouse-based camera rotation
+    if (app->input.mouseButtons[MouseButton::RIGHT] == ButtonState::BUTTON_PRESSED)
+    {
+        float sensitivity = 0.1f;
+        float deltaX = app->input.mouseDelta.x * sensitivity;
+        float deltaY = app->input.mouseDelta.y * sensitivity;
+
+        static float yaw = -90.0f;  // Looking toward -Z by default
+        static float pitch = -17.0f; // Starting angle like in Init()
+
+        yaw += deltaX;
+        pitch -= deltaY;
+
+        // Clamp pitch to avoid flip
+        if (pitch > 89.0f)  pitch = 89.0f;
+        if (pitch < -89.0f) pitch = -89.0f;
+
+        glm::vec3 front;
+        front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+        front.y = sin(glm::radians(pitch));
+        front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+        app->worldCamera.Front = glm::normalize(front);
+        app->worldCamera.Right = glm::normalize(glm::cross(app->worldCamera.Front, glm::vec3(0.0f, 1.0f, 0.0f)));
+        app->worldCamera.Up = glm::normalize(glm::cross(app->worldCamera.Right, app->worldCamera.Front));
+    }
+
+    // Check if camera actually moved
+    if (prevPosition != app->worldCamera.Position || prevFront != app->worldCamera.Front)
+    {
+        // Actualizar la matriz de vista
+        app->worldCamera.ViewMatrix = glm::lookAt(app->worldCamera.Position,
+            app->worldCamera.Position + app->worldCamera.Front,
+            app->worldCamera.Up);
+
+        // Update all entities' VP matrices
+        UpdateEntities(app);
+    }
 }
+
 
 void UpdateLights(App* app)
 {
@@ -530,6 +616,7 @@ void Render(App* app)
 
         case Mode_Deferred_Geometry:
         {
+
             glClearColor(0.0, 0.0, 0.0, 0.0);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             
