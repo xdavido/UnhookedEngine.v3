@@ -259,6 +259,11 @@ void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO)
         ++iteration;
     }
 
+    /*GLint uniformPosition = glGetUniformLocation(programTexturedGeometry.handle, "uDepth");
+    glActiveTexture(GL_TEXTURE0 + iteration);
+    glBindTexture(GL_TEXTURE_2D, aFBO.depthHandle );
+    glUniform1i(uniformPosition, iteration);*/
+
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
 
     glBindVertexArray(0);
@@ -374,7 +379,7 @@ void Init(App* app)
 
 void Gui(App* app)
 {
-
+    ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
     ImGui::Begin("Unhooked.v3 Parameters");
 
         ImGui::Text("FPS: %f", 1.0f / app->deltaTime);
