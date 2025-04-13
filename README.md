@@ -2,6 +2,8 @@
 
 **Unhooked Engine V3** es la evolución de **Unhooked Engine V2**, es un proyecto correspondiente a la asignatura "Advanced Graphics Programming" del grado en Diseño y Desarrollo de Videojuegos del CITM. 
 
+![Logo](UnhookedEngine_v3/WorkingDir/LogoImage.png)
+
 ## 🚀 Descripción del Proyecto
 
 Este motor implementa un **motor de renderizado diferido** basado en los conceptos enseñados en clase. Su objetivo principal es gestionar de manera eficiente una escena 3D compleja con múltiples luces, utilizando un enfoque de renderizado en etapas a través de un **G-buffer**. El sistema permite la visualización interactiva de la escena, con controles en tiempo real para modificar la cámara y las luces, proporcionando una base sólida para entender cómo funcionan los motores gráficos avanzados.
