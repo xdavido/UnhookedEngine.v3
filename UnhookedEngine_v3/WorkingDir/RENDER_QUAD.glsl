@@ -80,6 +80,7 @@ uniform float near = 0.1;
 uniform float far = 100.0;
     
 uniform int uDisplayMode;
+uniform bool uInvertDepth;
 
 layout(location=0) out vec4 oColor;
 
@@ -172,7 +173,14 @@ void main()
             float z = depthRaw * 2.0 - 1.0; // back to NDC
             float linearDepth = (2.0 * near * far) / (far + near - z * (far - near));
             float normalized = clamp(linearDepth / far, 0.0, 1.0);
+         
             oColor = vec4(vec3(normalized), 1.0);
+            if (uInvertDepth)
+            {
+                float inverseDepth = 1.0 - normalized;
+                oColor = vec4(vec3(inverseDepth), 1.0);
+            }
+
             break;
 
       default:

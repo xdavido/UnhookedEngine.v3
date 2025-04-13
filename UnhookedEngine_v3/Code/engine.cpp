@@ -251,6 +251,10 @@ void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO)
     GLint displayModeLoc = glGetUniformLocation(programTexturedGeometry.handle, "uDisplayMode");
     glUniform1i(displayModeLoc, static_cast<int>(app->deferredDisplayMode));
 
+    GLint invertDepthLoc = glGetUniformLocation(programTexturedGeometry.handle, "uInvertDepth");
+    glUniform1i(invertDepthLoc, static_cast<int>(app->InverseDepth));
+
+
     size_t iteration = 0;
 
     const char* uniformNames[] = { "uAlbedo", "uNormals", "uPosition", "uViewDir" };
@@ -441,6 +445,15 @@ void Gui(App* app)
         if (ImGui::Button(currentMode, ImVec2(200, 40))) {
             showDeferredModes = !showDeferredModes;
         }
+
+        if (app->deferredDisplayMode == DeferredDisplayMode::Depth)
+        {
+            if (ImGui::SmallButton(app->InverseDepth ? "Invertir OFF" : "Invertir ON"))
+            {
+                app->InverseDepth = !app->InverseDepth;
+            }
+        }
+
 
         if (showDeferredModes)
         {

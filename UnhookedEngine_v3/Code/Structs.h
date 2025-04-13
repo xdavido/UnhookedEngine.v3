@@ -309,6 +309,7 @@ struct App
 
     FrameBuffer primaryFBO;
     DeferredDisplayMode deferredDisplayMode = DeferredDisplayMode::Default;
+    bool InverseDepth;
 
    
 };
