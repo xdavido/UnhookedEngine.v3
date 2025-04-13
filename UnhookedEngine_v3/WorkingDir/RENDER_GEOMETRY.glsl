@@ -68,6 +68,7 @@ in vec3 vNormal;
 in vec3 vViewDir;
 
 uniform sampler2D uTexture;
+
 layout(location=0) out vec4 oColor;
 
 

@@ -636,6 +636,7 @@ void Update(App* app)
 
         // Update all entities' VP matrices
         UpdateEntities(app);
+        UpdateLights(app);
     }
 }
 
