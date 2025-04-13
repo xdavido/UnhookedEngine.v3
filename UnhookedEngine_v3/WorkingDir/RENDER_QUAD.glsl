@@ -1,4 +1,4 @@
-#ifdef RENDER_QUAD
+#ifdef RENDER_QUAD_FORWARD
 
 #if defined(VERTEX) ////////////////////////////////////////
 

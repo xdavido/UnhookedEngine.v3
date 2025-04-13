@@ -1,4 +1,4 @@
-#ifdef RENDER_GEOMETRY
+#ifdef RENDER_GEOMETRY_FORWARD
 #if defined(VERTEX) ////////////////////////////////////////
 
 layout(location=0) in vec3 aPosition;
@@ -26,7 +26,6 @@ layout(binding = 1, std140) uniform EntityParams
 {
   mat4 uWorldMatrix;
   mat4 uWorldViewProjectionMatrix;
-
 };
 
 out vec2 vTexCoord;
@@ -40,6 +39,7 @@ void main()
     vTexCoord = aTexCoord;
     vPosition = vec3(uWorldMatrix * vec4(aPosition,1.0));
     vNormal = vec3(uWorldMatrix * vec4(aNormal, 0.0));
+    vViewDir = uCameraPosition - vPosition;
     gl_Position = uWorldViewProjectionMatrix * vec4(aPosition,1.0);
    
 }
@@ -71,57 +71,59 @@ uniform sampler2D uTexture;
 layout(location=0) out vec4 oColor;
 
 
-vec3 CalcDirLight(Light alight, vec3 aNormal, vec3 aViewDir)
+vec3 CalcDirLight(Light alight, vec3 normal, vec3 viewDir, vec3 albedo)
 {
     vec3 lightDir = normalize(-alight.direction);
-    float diff = max(dot(aNormal, lightDir), 0.0);
-    vec3 reflectDir = reflect(-lightDir, aNormal);
-    float spec = pow(max(dot(aViewDir, reflectDir), 0.0), 2.0);
+    float diff = max(dot(normal, lightDir), 0.0);
+    float angleFactor = pow(diff, 0.7); // dispersión más abierta
+
+    vec3 reflectDir = reflect(-lightDir, normal);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 16.0);
 
     vec3 ambient = alight.color * 0.2;
-    vec3 diffuse = alight.color * diff;
-    vec3 specular = 0.1 * spec * alight.color;
-    return (ambient + diffuse + specular);
+    vec3 diffuse = angleFactor * alight.color * albedo * 0.8;
+    vec3 specular = spec * alight.color * 0.4;
+
+    return ambient + diffuse + specular;
 }
 
-vec3 CalcPointLight(Light alight, vec3 aNormal, vec3 aPosition, vec3 aViewDir) {
-    vec3 lightDir = normalize(alight.position - aPosition);
-    float diff = max(dot(aNormal, lightDir), 0.0);
-    vec3 reflectDir = reflect(-lightDir, aNormal);
-    float spec = pow(max(dot(aViewDir, reflectDir), 0.0), 32.0);  // Increased shininess
+vec3 CalcPointLight(Light pointLight, vec3 normal, vec3 position, vec3 viewDir, vec3 albedo)
+{
+    vec3 lightDir = normalize(pointLight.position - position);
+    float distance = length(pointLight.position - position);
 
-    float distance = length(alight.position - aPosition);
-    
-    float constant = 1.0;
-    float linear = 0.07;     
-    float quadratic = 0.017;  
+    float radius = 5.0; // Rango más grande
+    float attenuation = clamp(1.0 - distance / radius, 0.0, 1.0);
+    attenuation *= attenuation; // curva suave
 
-    float radius = 7.0; 
-    float attenuation = smoothstep(radius, radius * 0.2, distance);
+    float diff = max(dot(normal, lightDir), 0.0);
+    float angleFactor = pow(diff, 0.8); // más abierto
+    vec3 reflectDir = reflect(-lightDir, normal);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
 
-    vec3 ambient = alight.color * 0.2;
-    vec3 diffuse = alight.color * diff;
-    vec3 specular = vec3(0.2) * spec * alight.color;  // Increased specular
-    ambient *= attenuation;
-    diffuse *= attenuation;
-    specular *= attenuation;
-    
-    return (ambient + diffuse + specular);
+    vec3 ambient = pointLight.color * 0.15;
+    vec3 diffuse = angleFactor * pointLight.color * albedo * 0.7;
+    vec3 specular = spec * pointLight.color * 0.5;
+
+    return attenuation * (ambient + diffuse + specular);
 }
 
 void main()
 {
+    vec3 albedo = texture(uTexture, vTexCoord).rgb;
+    vec3 normal = normalize(vNormal);
+    vec3 viewDir = normalize(vViewDir);
     vec3 returnColor = vec3(0.0);
 
-    for(int i = 0 ; i < uLightCount; ++i)
+    for(int i = 0; i < uLightCount; ++i)
     {
-       if(uLight[i].type == 0)
+       if(uLight[i].type == 0) // Directional light
        {
-        returnColor += CalcDirLight(uLight[i], vNormal, vViewDir);
+            returnColor += CalcDirLight(uLight[i], normal, viewDir, albedo);
        }
-       else if(uLight[i].type == 1)
+       else if(uLight[i].type == 1) // Point light
        {
-        returnColor += CalcPointLight(uLight[i], vNormal, vPosition, vViewDir);       
+            returnColor += CalcPointLight(uLight[i], normal, vPosition, viewDir, albedo);       
        }
     }
 
@@ -130,6 +132,7 @@ void main()
 
 #endif
 #endif
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

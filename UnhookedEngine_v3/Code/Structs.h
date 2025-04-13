@@ -282,12 +282,6 @@ struct App
     u32 ModelTextureUniform;
     u32 planeIdx;
 
-    // texture indices
-    u32 diceTexIdx;
-    u32 whiteTexIdx;
-    u32 blackTexIdx;
-    u32 normalTexIdx;
-    u32 magentaTexIdx;
 
     // Mode
     Mode mode;

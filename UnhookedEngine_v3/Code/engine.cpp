@@ -310,14 +310,6 @@ void Init(App* app)
     app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", "RENDER_QUAD_DEFERRED");
     app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
 
-    app->diceTexIdx = LoadTexture2D(app, "dice.png");
-    app->whiteTexIdx = LoadTexture2D(app, "color_white.png");
-    app->blackTexIdx = LoadTexture2D(app, "color_black.png");
-    app->normalTexIdx = LoadTexture2D(app, "color_normal.png");
-    app->magentaTexIdx = LoadTexture2D(app, "color_magenta.png");
-
-    //Geometry Rendering loads
-
     //app->ModelIdx = LoadModel(app, "Patrick/Patrick.obj");
     app->ModelIdx = LoadModel(app, "Queen/Queen.obj");
     u32 planeIdx = LoadModel(app, "Plane/Plane.obj");
@@ -374,7 +366,6 @@ void Init(App* app)
     UnmapBuffer(entityUBO);
 
     app->mode = Mode_Deferred_Geometry;
-    
     app->primaryFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y);
 
 }
@@ -392,69 +383,95 @@ void Gui(App* app)
         }
        
         ImGui::Separator();
-        ImGui::Text("Deferred Layout:");
-
-        static bool showDeferredModes = false;
-
-        // Botón principal que muestra el modo actual
-        const char* currentMode = "Default";
-        switch (app->deferredDisplayMode) {
-        case DeferredDisplayMode::Albedo: currentMode = "Albedo"; break;
-        case DeferredDisplayMode::Normals: currentMode = "Normals"; break;
-        case DeferredDisplayMode::Position: currentMode = "Position"; break;
-        case DeferredDisplayMode::ViewDir: currentMode = "ViewDir"; break;
-        case DeferredDisplayMode::Depth: currentMode = "Depth"; break;
-
-        default: currentMode = "Default"; break;
-        }
-
-        if (ImGui::Button(currentMode, ImVec2(200, 50))) {
-            showDeferredModes = !showDeferredModes;
-        }
-
-        // Menú desplegable
-        if (showDeferredModes) {
-            ImGui::BeginChild("DeferredModes", ImVec2(100, 150), true);
-
-            if (ImGui::Selectable("Default", app->deferredDisplayMode == DeferredDisplayMode::Default)) {
-                app->deferredDisplayMode = DeferredDisplayMode::Default;
-                showDeferredModes = false;
-
-            }
-
-            if (ImGui::Selectable("Albedo", app->deferredDisplayMode == DeferredDisplayMode::Albedo)) {
-                app->deferredDisplayMode = DeferredDisplayMode::Albedo;
-                showDeferredModes = false;
-            }
-
-            if (ImGui::Selectable("Normals", app->deferredDisplayMode == DeferredDisplayMode::Normals)) {
-                app->deferredDisplayMode = DeferredDisplayMode::Normals;
-                showDeferredModes = false;
-            }
-
-            if (ImGui::Selectable("Position", app->deferredDisplayMode == DeferredDisplayMode::Position)) {
-                app->deferredDisplayMode = DeferredDisplayMode::Position;
-                showDeferredModes = false;
-            }
-
-            if (ImGui::Selectable("ViewDir", app->deferredDisplayMode == DeferredDisplayMode::ViewDir)) {
-                app->deferredDisplayMode = DeferredDisplayMode::ViewDir;
-                showDeferredModes = false;
-            }
-
-            if (ImGui::Selectable("Depth", app->deferredDisplayMode == DeferredDisplayMode::Depth)) {
-                app->deferredDisplayMode = DeferredDisplayMode::Depth;
-                showDeferredModes = false;
-            }
-
-            if (showDeferredModes)
+        if (ImGui::Button(app->mode == Mode_Forward_Geometry ? "Switch to Deferred" : "Switch to Forward", ImVec2(200, 30)))
+        {
+            if (app->mode == Mode_Forward_Geometry)
             {
-               RenderScreenFillQuad(app, app->primaryFBO);
+                app->mode = Mode_Deferred_Geometry;
+                // Load deferred shaders
+                app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", "RENDER_QUAD_DEFERRED");
+                app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY_DEFERRED");
+               
+            }
+            else
+            {
+                app->mode = Mode_Forward_Geometry;
+                // Load forward shaders
+                app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", "RENDER_QUAD_FORWARD");
+                app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY_FORWARD");
+            }
+            // Update uniform locations after loading new shaders
+            app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
+            app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
+        }
+
+        if (app->mode == Mode_Deferred_Geometry)
+        {
+            ImGui::Separator();
+            ImGui::Text("Deferred Layout:");
+
+            static bool showDeferredModes = false;
+
+            // Botón principal que muestra el modo actual
+            const char* currentMode = "Default";
+            switch (app->deferredDisplayMode) {
+            case DeferredDisplayMode::Albedo: currentMode = "Albedo"; break;
+            case DeferredDisplayMode::Normals: currentMode = "Normals"; break;
+            case DeferredDisplayMode::Position: currentMode = "Position"; break;
+            case DeferredDisplayMode::ViewDir: currentMode = "ViewDir"; break;
+            case DeferredDisplayMode::Depth: currentMode = "Depth"; break;
+
+            default: currentMode = "Default"; break;
             }
 
-            ImGui::EndChild();
+            if (ImGui::Button(currentMode, ImVec2(200, 50))) {
+                showDeferredModes = !showDeferredModes;
+            }
+
+            // Menú desplegable
+            if (showDeferredModes) {
+                ImGui::BeginChild("DeferredModes", ImVec2(100, 150), true);
+
+                if (ImGui::Selectable("Default", app->deferredDisplayMode == DeferredDisplayMode::Default)) {
+                    app->deferredDisplayMode = DeferredDisplayMode::Default;
+                    showDeferredModes = false;
+
+                }
+
+                if (ImGui::Selectable("Albedo", app->deferredDisplayMode == DeferredDisplayMode::Albedo)) {
+                    app->deferredDisplayMode = DeferredDisplayMode::Albedo;
+                    showDeferredModes = false;
+                }
+
+                if (ImGui::Selectable("Normals", app->deferredDisplayMode == DeferredDisplayMode::Normals)) {
+                    app->deferredDisplayMode = DeferredDisplayMode::Normals;
+                    showDeferredModes = false;
+                }
+
+                if (ImGui::Selectable("Position", app->deferredDisplayMode == DeferredDisplayMode::Position)) {
+                    app->deferredDisplayMode = DeferredDisplayMode::Position;
+                    showDeferredModes = false;
+                }
+
+                if (ImGui::Selectable("ViewDir", app->deferredDisplayMode == DeferredDisplayMode::ViewDir)) {
+                    app->deferredDisplayMode = DeferredDisplayMode::ViewDir;
+                    showDeferredModes = false;
+                }
+
+                if (ImGui::Selectable("Depth", app->deferredDisplayMode == DeferredDisplayMode::Depth)) {
+                    app->deferredDisplayMode = DeferredDisplayMode::Depth;
+                    showDeferredModes = false;
+                }
+
+                if (showDeferredModes)
+                {
+                    RenderScreenFillQuad(app, app->primaryFBO);
+                }
+
+                ImGui::EndChild();
+            }
+            ImGui::Separator();
         }
-        ImGui::Separator();
 
         bool lightChanged = false;
         if (ImGui::CollapsingHeader("Lights"))
@@ -628,10 +645,10 @@ void Render(App* app)
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-            /*glUniform1i(app->programUniformTexture, 0);
+            glUniform1i(app->programUniformTexture, 0);
             glActiveTexture(GL_TEXTURE0);
-            GLuint textureHandle = app->textures[app->diceTexIdx].handle;
-            glBindTexture(GL_TEXTURE_2D, textureHandle);*/
+            GLuint textureHandle = app->textures[app->ModelIdx].handle;
+            glBindTexture(GL_TEXTURE_2D, textureHandle);
 
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
 
