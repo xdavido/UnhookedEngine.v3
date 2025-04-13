@@ -1,4 +1,4 @@
-//
+ï»¿//
 // engine.cpp : Put all your graphics stuff in this file. This is kind of the graphics module.
 // In here, you should type all your OpenGL commands, and you can also type code to handle
 // input platform events (e.g to move the camera or react to certain shortcuts), writing some
@@ -335,7 +335,8 @@ void Init(App* app)
     app->entityUBO = CreateConstantBuffer(app->maxUniformBufferSize);
 
     //Lights
-    app->lights.push_back({ LightType::Light_Directional, vec3(0.2), vec3(-1,-0.25,0),vec3(0)});
+    app->lights.push_back({ LightType::Light_Directional, vec3(0.4), vec3(-1,-1,-1),vec3(0)});
+    app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0,0), vec3(0.5,0,1),vec3(0)});
     app->lights.push_back({ LightType::Light_Point, vec3(1,0.5,0.5), vec3(0),vec3({0, 8.5, 1}) });
     app->lights.push_back({ LightType::Light_Point, vec3(0.5,0.5,1), vec3(0),vec3(-5, 8.5, -3) });
     app->lights.push_back({ LightType::Light_Point, vec3(0.5,1,0.5), vec3(0),vec3(5, 8.5, -3) });
@@ -349,8 +350,8 @@ void Init(App* app)
 
     std::vector<glm::vec3> positions = {
      {0, 0, 0},   // Entidad central al frente
-     {-5, 0, -3}, // Entidad izquierda atrás
-     {5, 0, -3},  // Entidad derecha atrás
+     {-5, 0, -3}, // Entidad izquierda atrÃ¡s
+     {5, 0, -3},  // Entidad derecha atrÃ¡s
      {0, 0, -7},   // Entidad central al frente
     };
 
@@ -373,152 +374,171 @@ void Init(App* app)
 void Gui(App* app)
 {
     ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
-    ImGui::Begin("Unhooked.v3 Parameters");
 
-        ImGui::Text("FPS: %f", 1.0f / app->deltaTime);
+    // Estilo general
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.WindowRounding = 10.0f;
+    style.FrameRounding = 6.0f;
+    style.FramePadding = ImVec2(10, 6);
+    style.ItemSpacing = ImVec2(12, 8);
+    style.GrabRounding = 4.0f;
 
-        if (ImGui::CollapsingHeader("OpenGL Info"))
-        {
-            ImGui::TextWrapped("%s", app->mOpenGLInfo.c_str());
+    // Colores personalizados
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.13f, 0.13f, 0.15f, 1.00f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.25f, 0.35f, 1.00f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.35f, 0.50f, 1.00f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.45f, 0.60f, 1.00f));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.18f, 0.18f, 0.22f, 1.00f));
+    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.35f, 0.35f, 0.50f, 0.7f));
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.45f, 0.45f, 0.60f, 0.8f));
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.55f, 0.55f, 0.70f, 1.0f));
+
+    ImGui::Begin(" Unhooked.v3 Parameters");
+
+    ImGui::Text(" FPS: %.1f", 1.0f / app->deltaTime);
+    ImGui::Spacing();
+    ImGui::Separator();
+
+    if (ImGui::CollapsingHeader(" OpenGL Info", ImGuiTreeNodeFlags_NoAutoOpenOnLog))
+    {
+        ImGui::TextWrapped("%s", app->mOpenGLInfo.c_str());
+    }
+
+    ImGui::Spacing();
+
+    // Modo Rendering
+    ImGui::Text(" Render Mode");
+    if (ImGui::Button(app->mode == Mode_Forward_Geometry ? " Switch to Deferred" : " Switch to Forward", ImVec2(220, 35)))
+    {
+        app->mode = (app->mode == Mode_Forward_Geometry) ? Mode_Deferred_Geometry : Mode_Forward_Geometry;
+
+        app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_QUAD_DEFERRED" : "RENDER_QUAD_FORWARD");
+        app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_GEOMETRY_DEFERRED" : "RENDER_GEOMETRY_FORWARD");
+
+        app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
+        app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
+    }
+
+    ImGui::Spacing();
+
+    // Layout Deferred
+    if (app->mode == Mode_Deferred_Geometry)
+    {
+        ImGui::Text(" Deferred Layout");
+
+        static bool showDeferredModes = false;
+
+        const char* currentMode = "Default";
+        switch (app->deferredDisplayMode) {
+        case DeferredDisplayMode::Albedo: currentMode = "Albedo"; break;
+        case DeferredDisplayMode::Normals: currentMode = "Normals"; break;
+        case DeferredDisplayMode::Position: currentMode = "Position"; break;
+        case DeferredDisplayMode::ViewDir: currentMode = "ViewDir"; break;
+        case DeferredDisplayMode::Depth: currentMode = "Depth"; break;
+        default: break;
         }
-       
-        ImGui::Separator();
-        if (ImGui::Button(app->mode == Mode_Forward_Geometry ? "Switch to Deferred" : "Switch to Forward", ImVec2(200, 30)))
-        {
-            if (app->mode == Mode_Forward_Geometry)
-            {
-                app->mode = Mode_Deferred_Geometry;
-                // Load deferred shaders
-                app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", "RENDER_QUAD_DEFERRED");
-                app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY_DEFERRED");
-               
-            }
-            else
-            {
-                app->mode = Mode_Forward_Geometry;
-                // Load forward shaders
-                app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", "RENDER_QUAD_FORWARD");
-                app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY_FORWARD");
-            }
-            // Update uniform locations after loading new shaders
-            app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
-            app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
+
+        if (ImGui::Button(currentMode, ImVec2(200, 40))) {
+            showDeferredModes = !showDeferredModes;
         }
 
-        if (app->mode == Mode_Deferred_Geometry)
+        if (showDeferredModes)
         {
+            ImGui::BeginChild("DeferredModes", ImVec2(220, 180), true);
+            const auto showSelectable = [&](const char* label, DeferredDisplayMode mode)
+                {
+                    if (ImGui::Selectable(label, app->deferredDisplayMode == mode)) {
+                        app->deferredDisplayMode = mode;
+                        showDeferredModes = false;
+                    }
+                };
+            showSelectable("Default", DeferredDisplayMode::Default);
+            showSelectable("Albedo", DeferredDisplayMode::Albedo);
+            showSelectable("Normals", DeferredDisplayMode::Normals);
+            showSelectable("Position", DeferredDisplayMode::Position);
+            showSelectable("ViewDir", DeferredDisplayMode::ViewDir);
+            showSelectable("Depth", DeferredDisplayMode::Depth);
+            ImGui::EndChild();
+        }
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+
+    // Stress Test
+    static bool stressTestActive = false;
+    static std::vector<Light> originalLights;
+
+    if (ImGui::Button(stressTestActive ? " Disable Stress Test (1000 lights)" : " Enable Stress Test (1000 lights)", ImVec2(270, 35)))
+    {
+        stressTestActive = !stressTestActive;
+
+        if (stressTestActive)
+        {
+            originalLights = app->lights;
+            app->lights.clear();
+
+            const int gridSize = 10;
+            const float spacing = 3.0f;
+            const float startPos = -(gridSize * spacing) / 2.0f;
+
+            for (int x = 0; x < gridSize; ++x)
+                for (int z = 0; z < gridSize; ++z)
+                    for (int y = 0; y < 10; ++y)
+                        app->lights.push_back({
+                            LightType::Light_Point,
+                            glm::vec3(rand() / (float)RAND_MAX, rand() / (float)RAND_MAX, rand() / (float)RAND_MAX),
+                            glm::vec3(0.0f),
+                            glm::vec3(startPos + x * spacing, 0.5f + y * 0.5f, startPos + z * spacing)
+                            });
+        }
+        else
+        {
+            app->lights = originalLights;
+        }
+        UpdateLights(app);
+    }
+
+    ImGui::Spacing();
+
+    // Lights Panel
+    bool lightChanged = false;
+    if (ImGui::CollapsingHeader(" Lights"))
+    {
+        ImGui::Text("Total Lights: %d", app->lights.size());
+
+        for (auto& light : app->lights)
+        {
+            ImGui::PushID(&light);
+            float color[3] = { light.color.x, light.color.y, light.color.z };
+            float direction[3] = { light.direction.x, light.direction.y, light.direction.z };
+            float position[3] = { light.position.x, light.position.y, light.position.z };
+
+            if (ImGui::ColorEdit3("Color", color)) {
+                light.color = glm::vec3(color[0], color[1], color[2]);
+                lightChanged = true;
+            }
+
+            if (ImGui::DragFloat3("Direction", direction, 0.01f, -1.0f, 1.0f)) {
+                light.direction = glm::vec3(direction[0], direction[1], direction[2]);
+                lightChanged = true;
+            }
+
+            if (ImGui::DragFloat3("Position", position, 0.1f)) {
+                light.position = glm::vec3(position[0], position[1], position[2]);
+                lightChanged = true;
+            }
+
             ImGui::Separator();
-            ImGui::Text("Deferred Layout:");
-
-            static bool showDeferredModes = false;
-
-            // Botón principal que muestra el modo actual
-            const char* currentMode = "Default";
-            switch (app->deferredDisplayMode) {
-            case DeferredDisplayMode::Albedo: currentMode = "Albedo"; break;
-            case DeferredDisplayMode::Normals: currentMode = "Normals"; break;
-            case DeferredDisplayMode::Position: currentMode = "Position"; break;
-            case DeferredDisplayMode::ViewDir: currentMode = "ViewDir"; break;
-            case DeferredDisplayMode::Depth: currentMode = "Depth"; break;
-
-            default: currentMode = "Default"; break;
-            }
-
-            if (ImGui::Button(currentMode, ImVec2(200, 50))) {
-                showDeferredModes = !showDeferredModes;
-            }
-
-            // Menú desplegable
-            if (showDeferredModes) {
-                ImGui::BeginChild("DeferredModes", ImVec2(100, 150), true);
-
-                if (ImGui::Selectable("Default", app->deferredDisplayMode == DeferredDisplayMode::Default)) {
-                    app->deferredDisplayMode = DeferredDisplayMode::Default;
-                    showDeferredModes = false;
-
-                }
-
-                if (ImGui::Selectable("Albedo", app->deferredDisplayMode == DeferredDisplayMode::Albedo)) {
-                    app->deferredDisplayMode = DeferredDisplayMode::Albedo;
-                    showDeferredModes = false;
-                }
-
-                if (ImGui::Selectable("Normals", app->deferredDisplayMode == DeferredDisplayMode::Normals)) {
-                    app->deferredDisplayMode = DeferredDisplayMode::Normals;
-                    showDeferredModes = false;
-                }
-
-                if (ImGui::Selectable("Position", app->deferredDisplayMode == DeferredDisplayMode::Position)) {
-                    app->deferredDisplayMode = DeferredDisplayMode::Position;
-                    showDeferredModes = false;
-                }
-
-                if (ImGui::Selectable("ViewDir", app->deferredDisplayMode == DeferredDisplayMode::ViewDir)) {
-                    app->deferredDisplayMode = DeferredDisplayMode::ViewDir;
-                    showDeferredModes = false;
-                }
-
-                if (ImGui::Selectable("Depth", app->deferredDisplayMode == DeferredDisplayMode::Depth)) {
-                    app->deferredDisplayMode = DeferredDisplayMode::Depth;
-                    showDeferredModes = false;
-                }
-
-                if (showDeferredModes)
-                {
-                    RenderScreenFillQuad(app, app->primaryFBO);
-                }
-
-                ImGui::EndChild();
-            }
-            ImGui::Separator();
+            ImGui::PopID();
         }
 
-        bool lightChanged = false;
-        if (ImGui::CollapsingHeader("Lights"))
-        {
-
-            for (auto& light : app->lights)
-            {
-                vec3 checkVector;
-                ImGui::PushID(&light);
-                float color[3] = { light.color.x, light.color.y, light.color.z };
-                ImGui::DragFloat3("Color", color, 0.01, 0.0, 1.0);
-                checkVector = vec3(color[0], color[1], color[2]);
-                if (checkVector != light.color)
-                {
-                    light.color = checkVector;
-                    lightChanged = true;
-                }
-
-                float direction[3] = { light.direction.x, light.direction.y, light.direction.z };
-                ImGui::DragFloat3("Direction", direction, 0.01, -1.0, 1.0);
-                checkVector = vec3(direction[0], direction[1], direction[2]);
-                if (checkVector != light.direction)
-                {
-                    light.direction = checkVector;
-                    lightChanged = true;
-                }
-
-                float position[3] = { light.position.x, light.position.y, light.position.z };
-                ImGui::DragFloat3("Position", position);
-                checkVector = vec3(position[0], position[1], position[2]);
-                if (checkVector != light.position)
-                {
-                    light.position = checkVector;
-                    lightChanged = true;
-                }
-                ImGui::PopID();
-                ImGui::Separator();
-
-                if (lightChanged)
-                {
-                    UpdateLights(app);
-                }
-            }
-        }
-    
+        if (lightChanged) UpdateLights(app);
+    }
 
     ImGui::End();
+
+    ImGui::PopStyleColor(8); // Restore all colors
 }
 
 
@@ -546,11 +566,11 @@ void Update(App* app)
     // Tiempo entre frames para movimiento suave
     float deltaTime = app->deltaTime;
 
-    // Aumentar velocidad si Shift está presionado
+    // Aumentar velocidad si Shift estÃ¡ presionado
     float speedMultiplier = 1.0f;
     if (app->input.keys[Key::K_LEFT_SHIFT] == ButtonState::BUTTON_PRESSED)
     {
-        speedMultiplier = 3.0f; // Puedes ajustar este valor para más o menos velocidad extra
+        speedMultiplier = 3.0f; // Puedes ajustar este valor para mÃ¡s o menos velocidad extra
     }
 
     float velocity = app->worldCamera.cameraSpeed * deltaTime * speedMultiplier;
