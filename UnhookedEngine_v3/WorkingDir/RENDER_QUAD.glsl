@@ -74,11 +74,16 @@ uniform sampler2D uAlbedo;
 uniform sampler2D uNormals;
 uniform sampler2D uPosition;
 uniform sampler2D uViewDir;
+uniform sampler2D uDepth;
+
+uniform float near = 0.1;
+uniform float far = 100.0;
+    
+uniform int uDisplayMode;
 
 layout(location=0) out vec4 oColor;
 
 
-// Direccional con atenuación angular más suave
 vec3 CalcDirLight(Light alight, vec3 normal, vec3 viewDir, vec3 albedo)
 {
     vec3 lightDir = normalize(-alight.direction);
@@ -95,8 +100,6 @@ vec3 CalcDirLight(Light alight, vec3 normal, vec3 viewDir, vec3 albedo)
     return ambient + diffuse + specular;
 }
 
-
-// Punto con atenuación suavizada
 vec3 CalcPointLight(Light pointLight, vec3 normal, vec3 position, vec3 viewDir, vec3 albedo)
 {
     vec3 lightDir = normalize(pointLight.position - position);
@@ -126,24 +129,58 @@ void main()
     vec3 Normal = normalize(texture(uNormals, vTexCoord).xyz);
     vec3 Position = texture(uPosition, vTexCoord).xyz;
     vec3 ViewDir = normalize(texture(uViewDir, vTexCoord).xyz);
-
-    vec3 returnColor = vec3(0.0);
-
-    for(int i = 0 ; i < uLightCount; ++i)
+    
+   
+    switch (uDisplayMode)
     {
-        if(uLight[i].type == 0)
-        {
-            returnColor += CalcDirLight(uLight[i], Normal, ViewDir, Albedo);
-        }
-        else if(uLight[i].type == 1)
-        {
-            returnColor += CalcPointLight(uLight[i], Normal, Position, ViewDir, Albedo);       
-        }
+        case 0:  // Default: Iluminación con luces
+        
+            vec3 returnColor = vec3(0.0);
+            for(int i = 0; i < uLightCount; ++i)
+            {
+                if(uLight[i].type == 0)
+                {
+                    returnColor += CalcDirLight(uLight[i], Normal, ViewDir, Albedo);
+                }
+                else if(uLight[i].type == 1)
+                {
+                    returnColor += CalcPointLight(uLight[i], Normal, Position, ViewDir, Albedo);       
+                }
+            }
+            oColor = vec4(returnColor, 1.0);
+            break;
+
+        case 1:  // Albedo
+            oColor = vec4(Albedo, 1.0);
+            break;
+
+        case 2:  // Normals
+            oColor = vec4(Normal, 1.0);
+            break;
+
+        case 3:  // Position
+            oColor = vec4(Position, 1.0);
+            break;
+
+        case 4:  // ViewDir
+            oColor = vec4(ViewDir, 1.0);
+            break;
+
+        case 5:  // Linearized depth
+
+            float depthRaw = texture(uDepth, vTexCoord).r;
+            float z = depthRaw * 2.0 - 1.0; // back to NDC
+            float linearDepth = (2.0 * near * far) / (far + near - z * (far - near));
+            float normalized = clamp(linearDepth / far, 0.0, 1.0);
+            oColor = vec4(vec3(normalized), 1.0);
+            break;
+
+      default:
+            oColor = vec4(vec3(1.0, 0.0, 1.0), 1.0); // Magenta si algo falla
+            break;
     }
 
-    oColor = vec4(returnColor, 1.0);
 }
-
 
 #endif
 #endif

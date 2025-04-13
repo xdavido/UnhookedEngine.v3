@@ -21,6 +21,11 @@ struct Camera {
     glm::vec3 Up = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::vec3 Right = glm::vec3(1.0f, 0.0f, 0.0f);
 
+    // Control de cámara
+    float cameraSpeed = 5.0f;
+
+    float nearPlane = 0.1f;
+    float farPlane = 100.0f;
 };
 
 struct Buffer {
@@ -195,7 +200,7 @@ struct FrameBuffer
 
         glGenTextures(1, &depthHandle);
         glBindTexture(GL_TEXTURE_2D, depthHandle);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, aWidth, aHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, aWidth, aHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -219,6 +224,7 @@ struct FrameBuffer
 
         glDrawBuffers(enums.size(), enums.data());
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        return true;
     }
 
     void Clean()
@@ -232,6 +238,15 @@ struct FrameBuffer
         glDeleteTextures(1, &depthHandle);
         depthHandle = 0;
     }
+};
+
+enum class DeferredDisplayMode {
+    Default,
+    Albedo,
+    Normals,
+    Position,
+    ViewDir,
+    Depth
 };
 
 struct App
@@ -299,15 +314,9 @@ struct App
     std::vector<Light> lights;
 
     FrameBuffer primaryFBO;
+    DeferredDisplayMode deferredDisplayMode = DeferredDisplayMode::Default;
 
-    // Control de cámara
-    float cameraSpeed = 5.0f;
-    float mouseSensitivity = 0.1f;
-    float yaw = -90.0f;
-    float pitch = 0.0f;
-    bool firstMouse = true;
-    float lastX = 0.0f;
-    float lastY = 0.0f;
+   
 };
 
 

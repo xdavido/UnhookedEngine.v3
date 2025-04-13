@@ -247,25 +247,31 @@ void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
 
+
+    GLint displayModeLoc = glGetUniformLocation(programTexturedGeometry.handle, "uDisplayMode");
+    glUniform1i(displayModeLoc, static_cast<int>(app->deferredDisplayMode));
+
     size_t iteration = 0;
+
     const char* uniformNames[] = { "uAlbedo", "uNormals", "uPosition", "uViewDir" };
     for (const auto& texture : aFBO.attachments)
     {
         GLint uniformPosition = glGetUniformLocation(programTexturedGeometry.handle, uniformNames[iteration]);
-        
+
         glActiveTexture(GL_TEXTURE0 + iteration);
         glBindTexture(GL_TEXTURE_2D, texture.second);
         glUniform1i(uniformPosition, iteration);
         ++iteration;
     }
-
-    /*GLint uniformPosition = glGetUniformLocation(programTexturedGeometry.handle, "uDepth");
+    
+    GLint uniformPosition = glGetUniformLocation(programTexturedGeometry.handle, "uDepth");
     glActiveTexture(GL_TEXTURE0 + iteration);
-    glBindTexture(GL_TEXTURE_2D, aFBO.depthHandle );
-    glUniform1i(uniformPosition, iteration);*/
+    glBindTexture(GL_TEXTURE_2D, aFBO.depthHandle);
+    glUniform1i(uniformPosition, iteration);
+    
 
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
-
+  
     glBindVertexArray(0);
     glUseProgram(0);
 }
@@ -322,10 +328,9 @@ void Init(App* app)
     //Class06
   
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
-    float near = 0.1f;
-    float far = 1000.0f;
-    app->worldCamera.ProjectionMatrix = glm::perspective(glm::radians(60.f), aspectRatio, near, far);
-    app->worldCamera.Position = vec3(0, 7, 20);
+    
+    app->worldCamera.ProjectionMatrix = glm::perspective(glm::radians(60.f), aspectRatio, app->worldCamera.nearPlane, app->worldCamera.farPlane);
+    app->worldCamera.Position = vec3(0, 7, 6);
     app->worldCamera.Front = glm::vec3(0.0f, -0.3f, -1.0f); // Apuntando ligeramente hacia abajo
     app->worldCamera.ViewMatrix = glm::lookAt(app->worldCamera.Position, app->worldCamera.Position + app->worldCamera.Front, app->worldCamera.Up);
     
@@ -370,10 +375,7 @@ void Init(App* app)
 
     app->mode = Mode_Deferred_Geometry;
     
-    if (!app->primaryFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y)) {
-        ELOG("Failed to create FBO");
-        return;
-    }
+    app->primaryFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y);
 
 }
 
@@ -388,7 +390,70 @@ void Gui(App* app)
         {
             ImGui::TextWrapped("%s", app->mOpenGLInfo.c_str());
         }
+       
+        ImGui::Separator();
+        ImGui::Text("Deferred Layout:");
 
+        static bool showDeferredModes = false;
+
+        // Botón principal que muestra el modo actual
+        const char* currentMode = "Default";
+        switch (app->deferredDisplayMode) {
+        case DeferredDisplayMode::Albedo: currentMode = "Albedo"; break;
+        case DeferredDisplayMode::Normals: currentMode = "Normals"; break;
+        case DeferredDisplayMode::Position: currentMode = "Position"; break;
+        case DeferredDisplayMode::ViewDir: currentMode = "ViewDir"; break;
+        case DeferredDisplayMode::Depth: currentMode = "Depth"; break;
+
+        default: currentMode = "Default"; break;
+        }
+
+        if (ImGui::Button(currentMode, ImVec2(200, 50))) {
+            showDeferredModes = !showDeferredModes;
+        }
+
+        // Menú desplegable
+        if (showDeferredModes) {
+            ImGui::BeginChild("DeferredModes", ImVec2(100, 150), true);
+
+            if (ImGui::Selectable("Default", app->deferredDisplayMode == DeferredDisplayMode::Default)) {
+                app->deferredDisplayMode = DeferredDisplayMode::Default;
+                showDeferredModes = false;
+
+            }
+
+            if (ImGui::Selectable("Albedo", app->deferredDisplayMode == DeferredDisplayMode::Albedo)) {
+                app->deferredDisplayMode = DeferredDisplayMode::Albedo;
+                showDeferredModes = false;
+            }
+
+            if (ImGui::Selectable("Normals", app->deferredDisplayMode == DeferredDisplayMode::Normals)) {
+                app->deferredDisplayMode = DeferredDisplayMode::Normals;
+                showDeferredModes = false;
+            }
+
+            if (ImGui::Selectable("Position", app->deferredDisplayMode == DeferredDisplayMode::Position)) {
+                app->deferredDisplayMode = DeferredDisplayMode::Position;
+                showDeferredModes = false;
+            }
+
+            if (ImGui::Selectable("ViewDir", app->deferredDisplayMode == DeferredDisplayMode::ViewDir)) {
+                app->deferredDisplayMode = DeferredDisplayMode::ViewDir;
+                showDeferredModes = false;
+            }
+
+            if (ImGui::Selectable("Depth", app->deferredDisplayMode == DeferredDisplayMode::Depth)) {
+                app->deferredDisplayMode = DeferredDisplayMode::Depth;
+                showDeferredModes = false;
+            }
+
+            if (showDeferredModes)
+            {
+               RenderScreenFillQuad(app, app->primaryFBO);
+            }
+
+            ImGui::EndChild();
+        }
         ImGui::Separator();
 
         bool lightChanged = false;
@@ -471,7 +536,7 @@ void Update(App* app)
         speedMultiplier = 3.0f; // Puedes ajustar este valor para más o menos velocidad extra
     }
 
-    float velocity = app->cameraSpeed * deltaTime * speedMultiplier;
+    float velocity = app->worldCamera.cameraSpeed * deltaTime * speedMultiplier;
 
     if (app->input.keys[Key::K_W] == ButtonState::BUTTON_PRESSED)
         app->worldCamera.Position += app->worldCamera.Front * velocity;
@@ -563,10 +628,10 @@ void Render(App* app)
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-            glUniform1i(app->programUniformTexture, 0);
+            /*glUniform1i(app->programUniformTexture, 0);
             glActiveTexture(GL_TEXTURE0);
             GLuint textureHandle = app->textures[app->diceTexIdx].handle;
-            glBindTexture(GL_TEXTURE_2D, textureHandle);
+            glBindTexture(GL_TEXTURE_2D, textureHandle);*/
 
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
 
@@ -625,12 +690,16 @@ void Render(App* app)
             glClearColor(0.0, 0.0, 0.0, 0.0);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             
+            
             glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
+            
+           
             std::vector<GLuint> textures;
             for (auto& it : app->primaryFBO.attachments)
             {
                 textures.push_back(it.second);
             }
+            
             glDrawBuffers(textures.size(), textures.data());
 
             glClearColor(0.0, 0.0, 0.0, 0.0);
@@ -668,11 +737,12 @@ void Render(App* app)
                     glBindTexture(GL_TEXTURE_2D, 0);
                 }
             }
+
             glUseProgram(0);
-            glBindFramebuffer(GL_FRAMEBUFFER,0);
+            glClearColor(0.0, 0.0, 0.0, 0.0);
 
             RenderScreenFillQuad(app, app->primaryFBO);
-           
+
         }
         break;
 
