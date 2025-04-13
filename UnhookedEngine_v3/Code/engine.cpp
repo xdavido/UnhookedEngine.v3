@@ -326,7 +326,7 @@ void Init(App* app)
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
     
     app->worldCamera.ProjectionMatrix = glm::perspective(glm::radians(60.f), aspectRatio, app->worldCamera.nearPlane, app->worldCamera.farPlane);
-    app->worldCamera.Position = vec3(0, 7, 6);
+    app->worldCamera.Position = vec3(0, 7, 15);
     app->worldCamera.Front = glm::vec3(0.0f, -0.3f, -1.0f); // Apuntando ligeramente hacia abajo
     app->worldCamera.ViewMatrix = glm::lookAt(app->worldCamera.Position, app->worldCamera.Position + app->worldCamera.Front, app->worldCamera.Up);
     
@@ -339,8 +339,8 @@ void Init(App* app)
     app->entityUBO = CreateConstantBuffer(app->maxUniformBufferSize);
 
     //Lights
-    app->lights.push_back({ LightType::Light_Directional, vec3(0.4), vec3(-1,-1,-1),vec3(0)});
-    app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0,0), vec3(0.5,0,1),vec3(0)});
+    app->lights.push_back({ LightType::Light_Directional, vec3(0.7), vec3(-1,-1,-1),vec3(0)});
+    app->lights.push_back({ LightType::Light_Directional, vec3(0.3,0,0), vec3(0.5,0,0.5),vec3(0)});
     app->lights.push_back({ LightType::Light_Point, vec3(1,0.5,0.5), vec3(0),vec3({0, 8.5, 1}) });
     app->lights.push_back({ LightType::Light_Point, vec3(0.5,0.5,1), vec3(0),vec3(-5, 8.5, -3) });
     app->lights.push_back({ LightType::Light_Point, vec3(0.5,1,0.5), vec3(0),vec3(5, 8.5, -3) });

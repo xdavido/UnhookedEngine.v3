@@ -89,17 +89,19 @@ vec3 CalcDirLight(Light alight, vec3 normal, vec3 viewDir, vec3 albedo)
 {
     vec3 lightDir = normalize(-alight.direction);
     float diff = max(dot(normal, lightDir), 0.0);
-    float angleFactor = pow(diff, 0.7); // dispersión más abierta
+    float angleFactor = pow(diff, 0.7);
 
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 16.0);
 
-    vec3 ambient = alight.color * 0.2;
+    // Reduce la luz ambiental y hazla dependiente del ángulo para suavizar
+    vec3 ambient = alight.color * 0.05 + (0.15 * diff) * alight.color;
     vec3 diffuse = angleFactor * alight.color * albedo * 0.8;
     vec3 specular = spec * alight.color * 0.4;
 
     return ambient + diffuse + specular;
 }
+
 
 vec3 CalcPointLight(Light pointLight, vec3 normal, vec3 position, vec3 viewDir, vec3 albedo)
 {
