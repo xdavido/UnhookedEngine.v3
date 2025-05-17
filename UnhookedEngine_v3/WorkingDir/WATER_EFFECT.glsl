@@ -12,8 +12,7 @@ out Data
 {
     vec3 positionViewspace;
     vec3 normalViewspace;
-}
-VSOut;
+} VSOut;
 
 void main(void)
 {
@@ -64,14 +63,16 @@ void main()
     vec3 Pw = vec3(viewMatrixInv * vec4(FSIn.positionViewspace, 1.0)); // position in world space
     vec2 texCoord = gl_FragCoord.xy / viewportSize;
 
-    const vec2 wavelength = vec2(0.05);
-    const float waveStrength = 0.02;
+    const vec2 waveLength = vec2(2.0);
+    const float waveStrength = vec2(0.05);
     const float turbidityDistance = 10.0;
 
     // Animación de la distorsión con el tiempo
-    vec2 distortion1 = (texture(dudvMap, Pw.xz * 0.1 + vec2(time * 0.02)).rg * 2.0 - 1.0) * waveStrength;
-    vec2 distortion2 = (texture(dudvMap, Pw.xz * 0.1 + vec2(time * 0.02, time * 0.01)).rg * 2.0 - 1.0) * waveStrength;
-    vec2 distortion = distortion1 + distortion2;
+    //vec2 distortion1 = (texture(dudvMap, Pw.xz * 0.1 + vec2(time * 0.02)).rg * 2.0 - 1.0) * waveStrength;
+    //vec2 distortion2 = (texture(dudvMap, Pw.xz * 0.1 + vec2(time * 0.02, time * 0.01)).rg * 2.0 - 1.0) * waveStrength;
+    //vec2 distortion = distortion1 + distortion2;
+
+    vec2 distorsion = (2.0 * texture(dudvMap, Pw.xz / waveLength).rgb - vec2(1.0)) * waveStrength + waveStrength/7;
 
     // Distorted reflection and refraction
     vec2 reflectionTexCoord = vec2(texCoord.s, 1.0 - texCoord.t) + distortion;
@@ -91,7 +92,7 @@ void main()
     vec3 F0 = vec3(0.1);
     vec3 F = fresnelSchlick(max(0.0, dot(V, N)), F0);
     outColor.rgb = mix(refractionColor, reflectionColor, F);
-    outColor.a = 1.0;
+    outColor.a = 1.0; // Adjusted for transparency
 }
 
 #endif
