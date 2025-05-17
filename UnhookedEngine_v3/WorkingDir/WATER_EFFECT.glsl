@@ -64,7 +64,7 @@ void main()
     vec2 texCoord = gl_FragCoord.xy / viewportSize;
 
     const vec2 waveLength = vec2(2.0);
-    const float waveStrength = vec2(0.05);
+    const vec2 waveStrength = vec2(0.05);
     const float turbidityDistance = 10.0;
 
     // Animación de la distorsión con el tiempo
@@ -72,7 +72,7 @@ void main()
     //vec2 distortion2 = (texture(dudvMap, Pw.xz * 0.1 + vec2(time * 0.02, time * 0.01)).rg * 2.0 - 1.0) * waveStrength;
     //vec2 distortion = distortion1 + distortion2;
 
-    vec2 distorsion = (2.0 * texture(dudvMap, Pw.xz / waveLength).rgb - vec2(1.0)) * waveStrength + waveStrength/7;
+    vec2 distortion = (2.0 * texture(dudvMap, Pw.xz / waveLength).rg - vec2(1.0)) * waveStrength + waveStrength / 7.0;
 
     // Distorted reflection and refraction
     vec2 reflectionTexCoord = vec2(texCoord.s, 1.0 - texCoord.t) + distortion;

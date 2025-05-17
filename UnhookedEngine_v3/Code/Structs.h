@@ -25,7 +25,7 @@ struct Camera {
     float cameraSpeed = 5.0f;
 
     float nearPlane = 0.1f;
-    float farPlane = 100.0f;
+    float farPlane = 1000.0f;
 };
 
 struct Buffer {
@@ -168,6 +168,7 @@ struct Light
     vec3 direction;
     vec3 position;
 };
+
 struct FrameBuffer
 {
     GLuint handle;
@@ -227,6 +228,14 @@ struct FrameBuffer
         return true;
     }
 
+    void BindForWriting() {
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, handle);
+    }
+
+    void BindForReading() {
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, handle);
+    }
+
     void Clean()
     {
         glDeleteFramebuffers(1, &handle);
@@ -247,6 +256,11 @@ enum class DeferredDisplayMode {
     Position,
     ViewDir,
     Depth
+};
+
+enum WaterScenePart {
+    Reflection,
+    Refraction
 };
 
 struct App
@@ -276,9 +290,16 @@ struct App
     // program indices
     u32 texturedGeometryProgramIdx;
     u32 geometryProgramIdx;
+    u32 waterProgramIdx;
+
+    //Water Textures
+    u32 dudvMap;
+    u32 normalMap;
 
     //Modelo 3D cargado
     u32 ModelIdx;
+    u32 waterModelIdx;
+
     u32 ModelTextureUniform;
     u32 planeIdx;
 
@@ -311,6 +332,19 @@ struct App
     DeferredDisplayMode deferredDisplayMode = DeferredDisplayMode::Default;
     bool InverseDepth;
 
+    GLuint rtReflection = 0;
+    GLuint rtRefraction = 0;
+    GLuint rtReflectionDepth = 0;
+    GLuint rtRefractionDepth = 0;
+
+    FrameBuffer fboReflection;
+    FrameBuffer fboRefraction;
+
+    // Uniform location para el plano de recorte (usado en reflection/refraction)
+    GLint clipPlaneUniformLoc;
+
+    // Tiempo para animaciones
+    float time = 0.0f;
    
 };
 
