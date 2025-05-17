@@ -1,4 +1,4 @@
-# Blender 4.3.2 MTL File: 'Islands.blend'
+# Blender 4.3.2 MTL File: 'None'
 # www.blender.org
 
 newmtl Sculpt
@@ -10,3 +10,4 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
+map_Kd Sculpt_Base_Color.png

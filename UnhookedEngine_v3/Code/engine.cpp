@@ -315,8 +315,9 @@ void Init(App* app)
     app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
 
     //app->ModelIdx = LoadModel(app, "Patrick/Patrick.obj");
-    app->ModelIdx = LoadModel(app, "Queen/Queen.obj");
-    u32 planeIdx = LoadModel(app, "Plane/Plane.obj");
+    app->ModelIdx = LoadModel(app, "Island/Base.obj");
+    u32 SculptIdx = LoadModel(app, "Island/Sculpt.obj");
+    u32 WaterIdx = LoadModel(app, "Island/Water.obj");
 
     app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY_DEFERRED");
     app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
@@ -326,8 +327,8 @@ void Init(App* app)
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
     
     app->worldCamera.ProjectionMatrix = glm::perspective(glm::radians(60.f), aspectRatio, app->worldCamera.nearPlane, app->worldCamera.farPlane);
-    app->worldCamera.Position = vec3(0, 7, 15);
-    app->worldCamera.Front = glm::vec3(0.0f, -0.3f, -1.0f); // Apuntando ligeramente hacia abajo
+    app->worldCamera.Position = vec3(35, 25, 40); //Alejada hacia la derecha
+    app->worldCamera.Front = glm::vec3(-0.7f, -0.3f, -1.0f); // Apuntando ligeramente hacia abajo y a la izquierda
     app->worldCamera.ViewMatrix = glm::lookAt(app->worldCamera.Position, app->worldCamera.Position + app->worldCamera.Front, app->worldCamera.Up);
     
     glm::mat4 VP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
@@ -339,12 +340,14 @@ void Init(App* app)
     app->entityUBO = CreateConstantBuffer(app->maxUniformBufferSize);
 
     //Lights
-    app->lights.push_back({ LightType::Light_Directional, vec3(0.7), vec3(-1,-1,-1),vec3(0)});
-    app->lights.push_back({ LightType::Light_Directional, vec3(0.3,0,0), vec3(0.5,0,0.5),vec3(0)});
-    app->lights.push_back({ LightType::Light_Point, vec3(1,0.5,0.5), vec3(0),vec3({0, 8.5, 1}) });
-    app->lights.push_back({ LightType::Light_Point, vec3(0.5,0.5,1), vec3(0),vec3(-5, 8.5, -3) });
-    app->lights.push_back({ LightType::Light_Point, vec3(0.5,1,0.5), vec3(0),vec3(5, 8.5, -3) });
-    app->lights.push_back({ LightType::Light_Point, vec3(0.5,0.5,0), vec3(0),vec3(0, 8.5, -7) });
+    app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0.5,0.9), vec3(-1,-1,1),vec3(0)});
+    app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0.09,0.05), vec3(1,-1,-1),vec3(0)});
+
+    //Sculpts Point Lights
+    app->lights.push_back({ LightType::Light_Point, vec3(0.9,0.5,0.15), vec3(-1,-1,1),vec3(-4.4,11.8,-2.3) }); 
+    app->lights.push_back({ LightType::Light_Point, vec3(0.9,0.5,0.15), vec3(-1,-1,1),vec3(-4.4,11.8,1.1) });
+    app->lights.push_back({ LightType::Light_Point,vec3(0.9,0.5,0.15), vec3(-1,-1,1),vec3(-3.1,17.2,-0.4) });
+
 
     UpdateLights(app);
 
@@ -352,21 +355,14 @@ void Init(App* app)
     Buffer& entityUBO = app->entityUBO;
     MapBuffer(entityUBO, GL_WRITE_ONLY);
 
-    std::vector<glm::vec3> positions = {
-     {0, 0, 0},   // Entidad central al frente
-     {-5, 0, -3}, // Entidad izquierda atrás
-     {5, 0, -3},  // Entidad derecha atrás
-     {0, 0, -7},   // Entidad central al frente
-    };
+    glm::vec3 position = { 0, 0, 0 };
 
     //Geometry Plane
-    CreateEntity(app, planeIdx, VP, positions[0]);
+    CreateEntity(app, app->ModelIdx, VP, position);
+    CreateEntity(app, SculptIdx, VP, position);
+    CreateEntity(app, WaterIdx, VP, position);
 
-    //Geometry Queens
-    for (const auto& pos : positions)
-    {
-      CreateEntity(app, app->ModelIdx, VP, pos);
-    }
+ 
 
     UnmapBuffer(entityUBO);
 

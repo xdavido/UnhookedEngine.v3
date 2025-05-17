@@ -1,4 +1,4 @@
-# Blender 4.3.2 MTL File: 'Islands.blend'
+# Blender 4.3.2 MTL File: 'None'
 # www.blender.org
 
 newmtl Base
@@ -8,5 +8,4 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/Users/PC/Desktop/CITM/4º/2Q/PGA/Water Effect/Resources/fantasy-island/source/Texture/Base_Base_Color.png
-map_Ns C:/Users/PC/Desktop/CITM/4º/2Q/PGA/Water Effect/Resources/fantasy-island/source/Texture/Base_Roughness.png
+map_Kd Base_Base_Color.png
