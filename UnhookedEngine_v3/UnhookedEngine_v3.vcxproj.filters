@@ -115,5 +115,8 @@
     <None Include="WorkingDir\RENDER_GEOMETRY.glsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="WorkingDir\WATER_EFFECT.glsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

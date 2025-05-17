@@ -54,6 +54,7 @@
   <ItemGroup>
     <None Include="WorkingDir\RENDER_GEOMETRY.glsl" />
     <None Include="WorkingDir\RENDER_QUAD.glsl" />
+    <None Include="WorkingDir\WATER_EFFECT.glsl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
