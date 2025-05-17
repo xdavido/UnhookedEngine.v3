@@ -297,7 +297,8 @@ struct App
     u32 normalMap;
 
     //Modelo 3D cargado
-    u32 ModelIdx;
+    u32 BaseIdx;
+    u32 SculptIdx;
     u32 waterModelIdx;
 
     u32 ModelTextureUniform;

@@ -314,16 +314,19 @@ void Init(App* app)
     app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", "RENDER_QUAD_DEFERRED");
     app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
 
-    //app->ModelIdx = LoadModel(app, "Patrick/Patrick.obj");
-    app->ModelIdx = LoadModel(app, "Island/Base.obj");
-    u32 SculptIdx = LoadModel(app, "Island/Sculpt.obj");
-    u32 WaterIdx = LoadModel(app, "Island/Water.obj");
+    app->waterModelIdx = LoadModel(app, "Island/Water.obj");
+    app->dudvMap = LoadTexture2D(app,"Island/dudvmap.png" );
+    app->normalMap = LoadTexture2D(app, "Island/normalmap.png");
+
+    //app->BaseIdx = LoadModel(app, "Patrick/Patrick.obj");
+    app->BaseIdx = LoadModel(app, "Island/Base.obj");
+    app->SculptIdx = LoadModel(app, "Island/Sculpt.obj");
 
     app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY_DEFERRED");
     app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
 
-    //Class06
-  
+    
+    //Camera
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
     
     app->worldCamera.ProjectionMatrix = glm::perspective(glm::radians(60.f), aspectRatio, app->worldCamera.nearPlane, app->worldCamera.farPlane);
@@ -358,9 +361,9 @@ void Init(App* app)
     glm::vec3 position = { 0, 0, 0 };
 
     //Geometry Plane
-    CreateEntity(app, app->ModelIdx, VP, position);
-    CreateEntity(app, SculptIdx, VP, position);
-    CreateEntity(app, WaterIdx, VP, position);
+    CreateEntity(app, app->BaseIdx, VP, position);
+    CreateEntity(app, app->SculptIdx, VP, position);
+    CreateEntity(app, app->waterModelIdx, VP, position);
 
  
 
@@ -677,7 +680,7 @@ void Render(App* app)
 
             glUniform1i(app->programUniformTexture, 0);
             glActiveTexture(GL_TEXTURE0);
-            GLuint textureHandle = app->textures[app->ModelIdx].handle;
+            GLuint textureHandle = app->textures[app->BaseIdx].handle;
             glBindTexture(GL_TEXTURE_2D, textureHandle);
 
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
@@ -761,6 +764,8 @@ void Render(App* app)
 
             for (const auto& entity : app->entities)
             {
+               // if (entity.modelIndex == app->waterModelIdx) continue; // Saltar el agua
+
                 glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
                 Model& model = app->models[entity.modelIndex];
                 Mesh& mesh = app->meshes[model.meshIdx];
