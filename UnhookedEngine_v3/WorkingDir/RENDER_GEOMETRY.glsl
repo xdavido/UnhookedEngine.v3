@@ -28,6 +28,10 @@ layout(binding = 1, std140) uniform EntityParams
   mat4 uWorldViewProjectionMatrix;
 };
 
+
+uniform vec4 uClipPlane;  // Nuevo uniform para el plano de recorte
+
+out float gl_ClipDistance[1];  // Salida para el clipping
 out vec2 vTexCoord;
 out vec3 vPosition;
 out vec3 vNormal;
@@ -40,6 +44,10 @@ void main()
     vPosition = vec3(uWorldMatrix * vec4(aPosition,1.0));
     vNormal = vec3(uWorldMatrix * vec4(aNormal, 0.0));
     vViewDir = uCameraPosition - vPosition;
+
+    vec4 worldPos = uWorldMatrix * vec4(aPosition, 1.0);
+    gl_ClipDistance[0] = dot(worldPos, uClipPlane);
+
     gl_Position = uWorldViewProjectionMatrix * vec4(aPosition,1.0);
    
 }
@@ -170,6 +178,10 @@ layout(binding = 1, std140) uniform EntityParams
 
 };
 
+
+uniform vec4 uClipPlane;  // Nuevo uniform para el plano de recorte
+
+out float gl_ClipDistance[1];  // Salida para el clipping
 out vec2 vTexCoord;
 out vec3 vPosition;
 out vec3 vNormals;
@@ -182,6 +194,10 @@ void main()
     vPosition = vec3(uWorldMatrix * vec4(aPosition,1.0));
     vNormals = vec3(uWorldMatrix * vec4(aNormal, 0.0));
     vViewDir = uCameraPosition - vPosition;
+
+    vec4 worldPos = uWorldMatrix * vec4(aPosition, 1.0);
+    gl_ClipDistance[0] = dot(worldPos, uClipPlane);
+
     gl_Position = uWorldViewProjectionMatrix * vec4(aPosition,1.0);
    
 }

@@ -374,8 +374,8 @@ void Init(App* app)
     app->mode = Mode_Deferred_Geometry;
     app->primaryFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y);
 
-    app->refractionFBO.CreateFBO(1, app->displaySize.x, app->displaySize.y);
     app->reflectionFBO.CreateFBO(1, app->displaySize.x, app->displaySize.y);
+    app->refractionFBO.CreateFBO(1, app->displaySize.x, app->displaySize.y);
 
 }
 
@@ -642,6 +642,9 @@ void Update(App* app)
         UpdateEntities(app);
         UpdateLights(app);
     }
+
+    app->time += app->deltaTime;
+
 }
 
 
@@ -663,8 +666,137 @@ void UpdateLights(App* app)
     UnmapBuffer(app->globalUBO);
 }
 
+void UpdateEntitiesWithVP(App* app, const glm::mat4& VP)
+{
+    MapBuffer(app->entityUBO, GL_WRITE_ONLY);
+
+    for (auto& entity : app->entities)
+    {
+        glm::mat4* vpOffset = (glm::mat4*)((u8*)app->entityUBO.data + entity.entityBufferOffset + sizeof(glm::mat4));
+        *vpOffset = VP * entity.worldMatrix;
+    }
+
+    UnmapBuffer(app->entityUBO);
+}
+
+void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane)
+{
+    Program& geometryProgram = app->programs[app->geometryProgramIdx];
+    glUseProgram(geometryProgram.handle);
+
+    // Configurar plano de recorte
+    GLint clipPlaneLoc = glGetUniformLocation(geometryProgram.handle, "uClipPlane");
+    if (clipPlaneLoc != -1) {
+        glUniform4fv(clipPlaneLoc, 1, &clipPlane[0]);
+    }
+
+    glEnable(GL_CLIP_DISTANCE0);
+
+
+    // Configurar UBOs
+    glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
+
+    // Renderizar todas las entidades excepto el agua
+    for (const auto& entity : app->entities)
+    {
+        if (entity.modelIndex == app->waterModelIdx) continue;
+
+        glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
+        Model& model = app->models[entity.modelIndex];
+        Mesh& mesh = app->meshes[model.meshIdx];
+
+        for (size_t i = 0; i < mesh.submeshes.size(); ++i)
+        {
+            GLuint vao = FindVAO(mesh, i, geometryProgram);
+            glBindVertexArray(vao);
+
+            u32 submeshMaterialIdx = model.materialIdx[i];
+            Material& submeshMaterial = app->materials[submeshMaterialIdx];
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
+            glUniform1i(app->ModelTextureUniform, 0);
+
+            SubMesh& submesh = mesh.submeshes[i];
+            glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
+    }
+
+    glDisable(GL_CLIP_DISTANCE0);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_DEPTH_TEST);
+    glUseProgram(0);
+}
+
+void RenderWater(App* app)
+{
+    Program& waterProgram = app->programs[app->waterProgramIdx];
+    glUseProgram(waterProgram.handle);
+
+    // Configurar texturas
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, app->reflectionFBO.attachments[0].second);
+    glUniform1i(glGetUniformLocation(waterProgram.handle, "reflectionMap"), 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, app->refractionFBO.attachments[0].second);
+    glUniform1i(glGetUniformLocation(waterProgram.handle, "refractionMap"), 1);
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, app->reflectionFBO.depthHandle);
+    glUniform1i(glGetUniformLocation(waterProgram.handle, "reflectionDepth"), 2);
+
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, app->refractionFBO.depthHandle);
+    glUniform1i(glGetUniformLocation(waterProgram.handle, "refractionDepth"), 3);
+
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, app->normalMap);
+    glUniform1i(glGetUniformLocation(waterProgram.handle, "normalMap"), 4);
+
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, app->dudvMap);
+    glUniform1i(glGetUniformLocation(waterProgram.handle, "dudvMap"), 5);
+
+    // Configurar otros uniformes
+    glUniform2f(glGetUniformLocation(waterProgram.handle, "viewportSize"),
+        app->displaySize.x, app->displaySize.y);
+    glUniform1f(glGetUniformLocation(waterProgram.handle, "time"), app->time);
+
+    // Configurar matrices
+    glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "viewMatrix"), 1, GL_FALSE, &app->worldCamera.ViewMatrix[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "viewMatrixInv"), 1, GL_FALSE, &glm::inverse(app->worldCamera.ViewMatrix)[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "projectionMatrixInv"), 1, GL_FALSE, &glm::inverse(app->worldCamera.ProjectionMatrix)[0][0]);
+
+    // Renderizar el agua
+    for (const auto& entity : app->entities)
+    {
+        if (entity.modelIndex != app->waterModelIdx) continue;
+
+        glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
+        Model& model = app->models[entity.modelIndex];
+        Mesh& mesh = app->meshes[model.meshIdx];
+
+        for (size_t i = 0; i < mesh.submeshes.size(); ++i)
+        {
+            GLuint vao = FindVAO(mesh, i, waterProgram);
+            glBindVertexArray(vao);
+
+            SubMesh& submesh = mesh.submeshes[i];
+            glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+        }
+    }
+
+    glUseProgram(0);
+}
+
 void Render(App* app)
 {
+
+   
+
     switch (app->mode)
     {
         case Mode_Textured_Geometry:
@@ -744,67 +876,47 @@ void Render(App* app)
 
         case Mode_Deferred_Geometry:
         {
-
-            glClearColor(0.0, 0.0, 0.0, 0.0);
+            // 1. Renderizar escena de reflexión
+            glBindFramebuffer(GL_FRAMEBUFFER, app->reflectionFBO.handle);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            
-            
+
+            Camera reflectionCamera = app->worldCamera;
+            reflectionCamera.Position.y = -reflectionCamera.Position.y;
+            reflectionCamera.Front.y = -reflectionCamera.Front.y;
+            reflectionCamera.ViewMatrix = glm::lookAt(reflectionCamera.Position,
+                reflectionCamera.Position + reflectionCamera.Front,
+                reflectionCamera.Up);
+
+            glm::mat4 reflectionVP = reflectionCamera.ProjectionMatrix * reflectionCamera.ViewMatrix;
+            UpdateEntitiesWithVP(app, reflectionVP);
+            RenderSceneWithClipPlane(app, glm::vec4(0, 1, 0, 0));
+
+            // 2. Renderizar escena de refracción
+            glBindFramebuffer(GL_FRAMEBUFFER, app->refractionFBO.handle);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix);
+            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0));
+
+            // 3. Renderizar escena principal al FBO primario
             glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
-            
-           
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
             std::vector<GLuint> textures;
-            for (auto& it : app->primaryFBO.attachments)
-            {
+            for (auto& it : app->primaryFBO.attachments) {
                 textures.push_back(it.second);
             }
-            
             glDrawBuffers(textures.size(), textures.data());
 
-            glClearColor(0.0, 0.0, 0.0, 0.0);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix);
+            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0)); // Plano de recorte lejano
 
-            glViewport(0, 0, app->displaySize.x, app->displaySize.y);
+            // 4. Renderizar el agua
+            RenderWater(app);
 
-            Program& geometryProgram = app->programs[app->geometryProgramIdx];
-            glUseProgram(geometryProgram.handle);
-
-            glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
-
-            for (const auto& entity : app->entities)
-            {
-                if (entity.modelIndex == app->waterModelIdx) continue; // Saltar el agua
-
-                glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
-                Model& model = app->models[entity.modelIndex];
-                Mesh& mesh = app->meshes[model.meshIdx];
-
-                for (size_t i = 0; i < mesh.submeshes.size(); ++i)
-                {
-                    GLuint vao = FindVAO(mesh, i, geometryProgram);
-                    glBindVertexArray(vao);
-
-                    u32 submeshMaterialIdx = model.materialIdx[i];
-                    Material& submeshMaterial = app->materials[submeshMaterialIdx];
-
-                    glActiveTexture(GL_TEXTURE0);
-                    glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
-
-                    glUniform1i(app->ModelTextureUniform, 0);
-
-                    SubMesh& submesh = mesh.submeshes[i];
-                    glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
-
-                    glBindTexture(GL_TEXTURE_2D, 0);
-                }
-            }
-
-            glUseProgram(0);
-            glClearColor(0.0, 0.0, 0.0, 0.0);
-
+            // 5. Renderizar el quad final
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
             RenderScreenFillQuad(app, app->primaryFBO);
-
-
-
         }
         break;
 

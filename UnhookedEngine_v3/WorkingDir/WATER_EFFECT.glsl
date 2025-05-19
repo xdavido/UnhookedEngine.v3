@@ -1,7 +1,5 @@
-#ifdef WATER_EFFECT
-
-#if defined(VERTEX) ////////////////////////////////////////
-
+glsl
+#if defined(VERTEX)
 layout(location=0) in vec3 position;
 layout(location=1) in vec3 normal;
 
@@ -14,10 +12,10 @@ out Data
     vec3 normalViewspace;
 } VSOut;
 
-void main(void)
+void main()
 {
-    VSOut.positionViewspace = vec3(worldViewMatrix * vec4(position, 1));
-    VSOut.normalViewspace = vec3(worldViewMatrix * vec4(normal, 0));
+    VSOut.positionViewspace = vec3(worldViewMatrix * vec4(position, 1.0));
+    VSOut.normalViewspace = mat3(worldViewMatrix) * normal;
     gl_Position = projectionMatrix * vec4(VSOut.positionViewspace, 1.0);
 }
 
