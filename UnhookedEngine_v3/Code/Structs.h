@@ -64,7 +64,7 @@ struct Program
     GLuint handle;
     std::string filepath;
     std::string programName;
-    u64 lastWriteTimestamp; // What is this for?
+    u64 lastWriteTimestamp; 
     VertexShaderLayout vertexInputLayout;
 };
 
@@ -182,6 +182,7 @@ struct FrameBuffer
             return false;
         }
 
+        //Color
         std::vector<GLenum> enums;
         for (size_t i = 0; i < aAttachments; ++i)
         {
@@ -199,6 +200,7 @@ struct FrameBuffer
             enums.push_back(GL_COLOR_ATTACHMENT0 + i);
         }
 
+        //Depth 
         glGenTextures(1, &depthHandle);
         glBindTexture(GL_TEXTURE_2D, depthHandle);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, aWidth, aHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
@@ -209,6 +211,7 @@ struct FrameBuffer
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glBindTexture(GL_TEXTURE_2D, 0);
 
+
         glGenFramebuffers(1, &handle);
         glBindFramebuffer(GL_FRAMEBUFFER, handle);
         for (auto it = attachments.cbegin(); it != attachments.cend(); ++it)
@@ -216,6 +219,8 @@ struct FrameBuffer
             glFramebufferTexture(GL_FRAMEBUFFER, it->first, it->second, 0);
         }
         glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthHandle, 0);
+
+        //Check status
 
         GLenum framebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
         if (framebufferStatus != GL_FRAMEBUFFER_COMPLETE)
@@ -228,13 +233,6 @@ struct FrameBuffer
         return true;
     }
 
-    void BindForWriting() {
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, handle);
-    }
-
-    void BindForReading() {
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, handle);
-    }
 
     void Clean()
     {
@@ -338,8 +336,8 @@ struct App
     GLuint rtReflectionDepth = 0;
     GLuint rtRefractionDepth = 0;
 
-    FrameBuffer fboReflection;
-    FrameBuffer fboRefraction;
+    FrameBuffer reflectionFBO;
+    FrameBuffer refractionFBO;
 
     // Uniform location para el plano de recorte (usado en reflection/refraction)
     GLint clipPlaneUniformLoc;

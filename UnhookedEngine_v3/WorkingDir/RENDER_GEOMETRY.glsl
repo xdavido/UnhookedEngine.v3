@@ -94,7 +94,7 @@ vec3 CalcPointLight(Light pointLight, vec3 normal, vec3 position, vec3 viewDir, 
     vec3 lightDir = normalize(pointLight.position - position);
     float distance = length(pointLight.position - position);
 
-    float radius = 5.0; // Rango más grande
+    float radius = 20.0; // Rango más grande
     float attenuation = clamp(1.0 - distance / radius, 0.0, 1.0);
     attenuation *= attenuation; // curva suave
 

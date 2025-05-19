@@ -280,6 +280,8 @@ void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO)
     glUseProgram(0);
 }
 
+
+
 void Init(App* app)
 {
     // TODO: Initialize your resources here!
@@ -318,13 +320,14 @@ void Init(App* app)
     app->dudvMap = LoadTexture2D(app,"Island/dudvmap.png" );
     app->normalMap = LoadTexture2D(app, "Island/normalmap.png");
 
-    //app->BaseIdx = LoadModel(app, "Patrick/Patrick.obj");
     app->BaseIdx = LoadModel(app, "Island/Base.obj");
     app->SculptIdx = LoadModel(app, "Island/Sculpt.obj");
 
     app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY_DEFERRED");
     app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
 
+
+    app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT");
     
     //Camera
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
@@ -371,6 +374,9 @@ void Init(App* app)
 
     app->mode = Mode_Deferred_Geometry;
     app->primaryFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y);
+
+    app->refractionFBO.CreateFBO(1, app->displaySize.x, app->displaySize.y);
+    app->reflectionFBO.CreateFBO(1, app->displaySize.x, app->displaySize.y);
 
 }
 
@@ -658,6 +664,13 @@ void UpdateLights(App* app)
     UnmapBuffer(app->globalUBO);
 }
 
+void PassWaterScene()
+
+{
+
+}
+
+
 void Render(App* app)
 {
     switch (app->mode)
@@ -706,6 +719,9 @@ void Render(App* app)
 
             for (const auto& entity : app->entities)
             {
+
+                if (entity.modelIndex == app->waterModelIdx) continue; // Saltar el agua
+
                 glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
                 Model& model = app->models[entity.modelIndex];
                 Mesh& mesh = app->meshes[model.meshIdx];
@@ -764,7 +780,7 @@ void Render(App* app)
 
             for (const auto& entity : app->entities)
             {
-               // if (entity.modelIndex == app->waterModelIdx) continue; // Saltar el agua
+                if (entity.modelIndex == app->waterModelIdx) continue; // Saltar el agua
 
                 glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
                 Model& model = app->models[entity.modelIndex];
@@ -794,6 +810,8 @@ void Render(App* app)
             glClearColor(0.0, 0.0, 0.0, 0.0);
 
             RenderScreenFillQuad(app, app->primaryFBO);
+
+
 
         }
         break;
