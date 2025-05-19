@@ -331,11 +331,6 @@ struct App
     DeferredDisplayMode deferredDisplayMode = DeferredDisplayMode::Default;
     bool InverseDepth;
 
-    GLuint rtReflection = 0;
-    GLuint rtRefraction = 0;
-    GLuint rtReflectionDepth = 0;
-    GLuint rtRefractionDepth = 0;
-
     FrameBuffer reflectionFBO;
     FrameBuffer refractionFBO;
 

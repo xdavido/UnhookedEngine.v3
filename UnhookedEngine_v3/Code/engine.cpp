@@ -284,7 +284,6 @@ void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO)
 
 void Init(App* app)
 {
-    // TODO: Initialize your resources here!
     glEnable(GL_DEPTH_TEST);
 
     app->quadVertexBuffer = CreateStaticIndexBuffer(sizeof(vertices));
@@ -556,7 +555,7 @@ void Gui(App* app)
 
     ImGui::End();
 
-    ImGui::PopStyleColor(8); // Restore all colors
+    ImGui::PopStyleColor(8);
 }
 
 
@@ -663,13 +662,6 @@ void UpdateLights(App* app)
     }
     UnmapBuffer(app->globalUBO);
 }
-
-void PassWaterScene()
-
-{
-
-}
-
 
 void Render(App* app)
 {
