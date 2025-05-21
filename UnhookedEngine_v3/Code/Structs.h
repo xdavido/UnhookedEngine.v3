@@ -334,6 +334,7 @@ struct App
     FrameBuffer reflectionFBO;
     FrameBuffer refractionFBO;
 
+    float waterTileSize = 8.0f;
     // Uniform location para el plano de recorte (usado en reflection/refraction)
     GLint clipPlaneUniformLoc;
 

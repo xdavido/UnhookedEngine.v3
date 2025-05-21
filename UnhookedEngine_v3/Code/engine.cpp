@@ -554,6 +554,12 @@ void Gui(App* app)
         if (lightChanged) UpdateLights(app);
     }
 
+    if (ImGui::CollapsingHeader("Water Effect")) 
+    {
+        ImGui::SliderFloat("Wave Tile Size", &app->waterTileSize, 0.1f, 20.0f);
+    }
+
+
     ImGui::End();
 
     ImGui::PopStyleColor(8);
@@ -737,6 +743,9 @@ void RenderWater(App* app)
     // Configurar matrices
     glm::mat4 projectionMatrix = app->worldCamera.ProjectionMatrix;
     glm::mat4 worldViewMatrix = app->worldCamera.ViewMatrix;
+
+    GLint tileSizeLoc = glGetUniformLocation(waterProgram.handle, "tileSize");
+    glUniform1f(tileSizeLoc, app->waterTileSize); 
 
     glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "projectionMatrix"), 1, GL_FALSE, &projectionMatrix[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "worldViewMatrix"), 1, GL_FALSE, &worldViewMatrix[0][0]);

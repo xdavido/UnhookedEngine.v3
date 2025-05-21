@@ -23,6 +23,7 @@ void main()
 
 uniform vec2 viewportSize;
 uniform float time;  // Para animación
+uniform float tileSize; 
 
 uniform mat4 viewMatrix;
 uniform mat4 viewMatrixInv;
@@ -61,13 +62,15 @@ void main()
     vec3 Pw = vec3(viewMatrixInv * vec4(FSIn.positionViewspace, 1.0)); // position in world space
     vec2 texCoord = gl_FragCoord.xy / viewportSize;
 
-    const vec2 waveLength = vec2(2.0);
+    const vec2 waveLength = vec2(1.0);
     const vec2 waveStrength = vec2(0.05);
-    const float turbidityDistance = 10.0;
+    const float turbidityDistance = 1.0;
 
     // Animación de la distorsión con el tiempo
-    vec2 distortion1 = (texture(dudvMap, Pw.xz * 0.1 + vec2(time * 0.02)).rg * 2.0 - 1.0) * waveStrength;
-    vec2 distortion2 = (texture(dudvMap, Pw.xz * 0.1 + vec2(time * 0.02, time * 0.01)).rg * 2.0 - 1.0) * waveStrength;
+    // Reemplaza las líneas donde se muestrean las texturas dudvMap y normalMap
+    vec2 distortion1 = (texture(dudvMap, Pw.xz * 0.1 / tileSize + vec2(time * 0.02)).rg * 2.0 - 1.0) * waveStrength;
+    vec2 distortion2 = (texture(dudvMap, Pw.xz * 0.1 / tileSize + vec2(time * 0.02, time * 0.01)).rg * 2.0 - 1.0) * waveStrength;
+
     vec2 distortion = distortion1 + distortion2;
 
    //vec2 distortion = (2.0 * texture(dudvMap, Pw.xz / waveLength).rg - vec2(1.0)) * waveStrength + waveStrength / 7.0;
@@ -82,12 +85,12 @@ void main()
     float distortedGroundDepth = texture(refractionDepth, refractionTexCoord).x;
     vec3 distortedGroundPosViewSpace = reconstructPixelPosition(distortedGroundDepth);
     float distortedWaterDepth = FSIn.positionViewspace.z - distortedGroundPosViewSpace.z;
-    float tintFactor = clamp(distortedWaterDepth / turbidityDistance, 0.0, 1.0);
+    float tintFactor = clamp(distortedWaterDepth / turbidityDistance, 0.0, 0.1);
     vec3 waterColor = vec3(0.25, 0.4, 0.6);
     refractionColor = mix(refractionColor, waterColor, tintFactor);
 
     // Fresnel
-    vec3 F0 = vec3(0.1);
+    vec3 F0 = vec3(0.01);
     vec3 F = fresnelSchlick(max(0.0, dot(V, N)), F0);
     outColor.rgb = mix(refractionColor, reflectionColor, F);
    
