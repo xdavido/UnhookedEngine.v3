@@ -332,7 +332,7 @@ void Init(App* app)
     app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
 
 
-    app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT");
+    app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT_DEFERRED");
     
     //Camera
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
@@ -428,6 +428,8 @@ void Gui(App* app)
 
         app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_QUAD_DEFERRED" : "RENDER_QUAD_FORWARD");
         app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_GEOMETRY_DEFERRED" : "RENDER_GEOMETRY_FORWARD");
+        app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", app->mode == Mode_Deferred_Geometry ? "WATER_EFFECT_DEFERRED" : "WATER_EFFECT_FORWARD");
+
 
         app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
         app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
@@ -596,7 +598,7 @@ void Update(App* app)
     float deltaTime = app->deltaTime;
 
     // Aumentar velocidad si Shift está presionado
-    float speedMultiplier = 1.0f;
+    float speedMultiplier = 2.0f;
     if (app->input.keys[Key::K_LEFT_SHIFT] == ButtonState::BUTTON_PRESSED)
     {
         speedMultiplier = 3.0f; // Puedes ajustar este valor para más o menos velocidad extra
@@ -739,6 +741,7 @@ void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane)
     glUseProgram(0);
 }
 
+
 void RenderWater(App* app)
 {
 
@@ -750,7 +753,7 @@ void RenderWater(App* app)
     glm::mat4 worldViewMatrix = app->worldCamera.ViewMatrix;
 
     GLint tileSizeLoc = glGetUniformLocation(waterProgram.handle, "tileSize");
-    glUniform1f(tileSizeLoc, app->waterTileSize); 
+    glUniform1f(tileSizeLoc, app->waterTileSize);
 
     glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "projectionMatrix"), 1, GL_FALSE, &projectionMatrix[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "worldViewMatrix"), 1, GL_FALSE, &worldViewMatrix[0][0]);
@@ -787,16 +790,24 @@ void RenderWater(App* app)
     glBindTexture(GL_TEXTURE_2D, app->textures[app->foamMap].handle);
     glUniform1i(glGetUniformLocation(waterProgram.handle, "foamMap"), 6);
 
-    // Configurar otros uniformes
-    glUniform2f(glGetUniformLocation(waterProgram.handle, "viewportSize"),(float)app->displaySize.x, (float)app->displaySize.y);
+    glUniform2f(glGetUniformLocation(waterProgram.handle, "viewportSize"), (float)app->displaySize.x, (float)app->displaySize.y);
     glUniform1f(glGetUniformLocation(waterProgram.handle, "time"), app->time);
 
-    // Renderizar el agua
+
+
     for (const auto& entity : app->entities)
     {
         if (entity.modelIndex != app->waterModelIdx) continue;
 
+        /*if (app->mode == Mode_Forward_Geometry)
+        {
+            glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "worldViewMatrix"), 1, GL_FALSE, &(app->worldCamera.ViewMatrix[0][0] * entity.worldMatrix)[0][0]);
+        }
+        */
+        
         glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
+        
+
         Model& model = app->models[entity.modelIndex];
         Mesh& mesh = app->meshes[model.meshIdx];
 
@@ -810,17 +821,59 @@ void RenderWater(App* app)
         }
     }
 
+    glDisable(GL_BLEND);
     glUseProgram(0);
 }
+
 
 void Render(App* app)
 {
 
-   
+    // 1. Renderizar reflexión
+    glBindFramebuffer(GL_FRAMEBUFFER, app->reflectionFBO.handle);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Configurar cámara de reflexión
+    Camera reflectionCamera = app->worldCamera;
+    reflectionCamera.Position.y = -reflectionCamera.Position.y; // Invertir posición Y
+    reflectionCamera.Front.y = -reflectionCamera.Front.y;      // Invertir dirección Y (equivalente a pitch negativo)
+    reflectionCamera.ViewMatrix = glm::lookAt(reflectionCamera.Position, reflectionCamera.Position + reflectionCamera.Front,reflectionCamera.Up);
+
+    // Renderizar escena con plano de recorte para reflexión
+    glm::mat4 reflectionVP = reflectionCamera.ProjectionMatrix * reflectionCamera.ViewMatrix;
+    UpdateEntitiesWithVP(app, reflectionVP);
+    RenderSceneWithClipPlane(app, glm::vec4(0, 1, 0, 0)); // Plano de recorte para reflexión
+
+    // 2. Renderizar refracción
+    glBindFramebuffer(GL_FRAMEBUFFER, app->refractionFBO.handle);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Usar cámara normal para refracción
+    glm::mat4 refractionVP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
+    UpdateEntitiesWithVP(app, refractionVP);
+    RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0)); // Plano de recorte para refracción
+
+    // 3. Renderizar escena principal
+    glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Configurar múltiples render targets si es necesario
+    std::vector<GLuint> textures;
+    for (auto& it : app->primaryFBO.attachments) {
+        textures.push_back(it.second);
+    }
+    glDrawBuffers(textures.size(), textures.data());
+
+    // Renderizar escena normal sin plano de recorte (o con uno muy lejano)
+    UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix);
+    RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
+
+    // 4. Renderizar el agua
+    RenderWater(app);
 
     switch (app->mode)
     {
-        case Mode_Textured_Geometry:
+        case Mode_Textured_Geometry: //modo textura en pantalla ( QUAD SHADER )
         {
 
             glClearColor(0.0, 0.0, 0.0, 0.0);
@@ -852,95 +905,51 @@ void Render(App* app)
 
         case Mode_Forward_Geometry:
         {
-            glClearColor(0.0, 0.0, 0.0, 0.0);
+          /*  glClearColor(0.0, 0.0, 0.0, 0.0);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glViewport(0, 0, app->displaySize.x, app->displaySize.y);*/
 
-            glViewport(0, 0, app->displaySize.x, app->displaySize.y);
+            //// Primero renderizar la escena normal
+            //Program& geometryProgram = app->programs[app->geometryProgramIdx];
+            //glUseProgram(geometryProgram.handle);
+            //glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
 
-            Program& geometryProgram = app->programs[app->geometryProgramIdx];
-            glUseProgram(geometryProgram.handle);
+            //for (const auto& entity : app->entities)
+            //{
+            //    if (entity.modelIndex == app->waterModelIdx) continue; // Saltar el agua
 
-            glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
+            //    glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
+            //    Model& model = app->models[entity.modelIndex];
+            //    Mesh& mesh = app->meshes[model.meshIdx];
 
-            for (const auto& entity : app->entities)
-            {
+            //    for (size_t i = 0; i < mesh.submeshes.size(); ++i)
+            //    {
+            //        GLuint vao = FindVAO(mesh, i, geometryProgram);
+            //        glBindVertexArray(vao);
 
-                if (entity.modelIndex == app->waterModelIdx) continue; // Saltar el agua
+            //        u32 submeshMaterialIdx = model.materialIdx[i];
+            //        Material& submeshMaterial = app->materials[submeshMaterialIdx];
 
-                glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
-                Model& model = app->models[entity.modelIndex];
-                Mesh& mesh = app->meshes[model.meshIdx];
+            //        glActiveTexture(GL_TEXTURE0);
+            //        glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
+            //        glUniform1i(app->ModelTextureUniform, 0);
 
-                for (size_t i = 0; i < mesh.submeshes.size(); ++i)
-                {
-                    GLuint vao = FindVAO(mesh, i, geometryProgram);
-                    glBindVertexArray(vao);
+            //        SubMesh& submesh = mesh.submeshes[i];
+            //        glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
 
-                    u32 submeshMaterialIdx = model.materialIdx[i];
-                    Material& submeshMaterial = app->materials[submeshMaterialIdx];
-
-                    glActiveTexture(GL_TEXTURE0);
-                    glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
-
-                    glUniform1i(app->ModelTextureUniform, 0);
-
-                    SubMesh& submesh = mesh.submeshes[i];
-                    glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
-
-                    glBindTexture(GL_TEXTURE_2D, 0);
-                }
-            }
-
+            //        glBindTexture(GL_TEXTURE_2D, 0);
+            //    }
+            //}
             
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
         }
         break;
 
         case Mode_Deferred_Geometry:
         {
-            // 1. Renderizar reflexión
-            glBindFramebuffer(GL_FRAMEBUFFER, app->reflectionFBO.handle);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // Configurar cámara de reflexión
-            Camera reflectionCamera = app->worldCamera;
-            reflectionCamera.Position.y = -reflectionCamera.Position.y; // Invertir posición Y
-            reflectionCamera.Front.y = -reflectionCamera.Front.y;      // Invertir dirección Y (equivalente a pitch negativo)
-            reflectionCamera.ViewMatrix = glm::lookAt(reflectionCamera.Position,
-                reflectionCamera.Position + reflectionCamera.Front,
-                reflectionCamera.Up);
-
-            // Renderizar escena con plano de recorte para reflexión
-            glm::mat4 reflectionVP = reflectionCamera.ProjectionMatrix * reflectionCamera.ViewMatrix;
-            UpdateEntitiesWithVP(app, reflectionVP);
-            RenderSceneWithClipPlane(app, glm::vec4(0, 1, 0, 0)); // Plano de recorte para reflexión
-
-            // 2. Renderizar refracción
-            glBindFramebuffer(GL_FRAMEBUFFER, app->refractionFBO.handle);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            // Usar cámara normal para refracción
-            glm::mat4 refractionVP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
-            UpdateEntitiesWithVP(app, refractionVP);
-            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0)); // Plano de recorte para refracción
-
-            // 3. Renderizar escena principal
-            glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            // Configurar múltiples render targets si es necesario
-            std::vector<GLuint> textures;
-            for (auto& it : app->primaryFBO.attachments) {
-                textures.push_back(it.second);
-            }
-            glDrawBuffers(textures.size(), textures.data());
-
-            // Renderizar escena normal sin plano de recorte (o con uno muy lejano)
-            UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix);
-            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
-
-            // 4. Renderizar el agua
-            RenderWater(app);
-
+            
             // 5. Renderizar el quad final
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             RenderScreenFillQuad(app, app->primaryFBO);
