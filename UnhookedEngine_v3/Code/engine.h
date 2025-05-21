@@ -34,3 +34,7 @@ void CreateEntity(App* app, const u32 aModelIdx, const glm::mat4& aVP, const glm
 
 void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO);
 
+void RenderWater(App* app);
+
+void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane);
+

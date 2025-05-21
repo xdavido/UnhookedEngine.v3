@@ -190,8 +190,9 @@ GLuint CreateTexture2DFromImage(Image image)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
     glGenerateMipmap(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -687,11 +688,10 @@ void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane)
     // Configurar plano de recorte
     GLint clipPlaneLoc = glGetUniformLocation(geometryProgram.handle, "uClipPlane");
     if (clipPlaneLoc != -1) {
-        glUniform4fv(clipPlaneLoc, 1, &clipPlane[0]);
+        glUniform4fv(clipPlaneLoc, 1, glm::value_ptr(clipPlane));
     }
 
     glEnable(GL_CLIP_DISTANCE0);
-
 
     // Configurar UBOs
     glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
@@ -725,15 +725,24 @@ void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane)
     }
 
     glDisable(GL_CLIP_DISTANCE0);
-    glDepthMask(GL_TRUE);
-    glEnable(GL_DEPTH_TEST);
     glUseProgram(0);
 }
 
 void RenderWater(App* app)
 {
+
     Program& waterProgram = app->programs[app->waterProgramIdx];
     glUseProgram(waterProgram.handle);
+
+    // Configurar matrices
+    glm::mat4 projectionMatrix = app->worldCamera.ProjectionMatrix;
+    glm::mat4 worldViewMatrix = app->worldCamera.ViewMatrix;
+
+    glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "projectionMatrix"), 1, GL_FALSE, &projectionMatrix[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "worldViewMatrix"), 1, GL_FALSE, &worldViewMatrix[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "viewMatrix"), 1, GL_FALSE, &app->worldCamera.ViewMatrix[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "viewMatrixInv"), 1, GL_FALSE, &glm::inverse(app->worldCamera.ViewMatrix)[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "projectionMatrixInv"), 1, GL_FALSE, &glm::inverse(projectionMatrix)[0][0]);
 
     // Configurar texturas
     glActiveTexture(GL_TEXTURE0);
@@ -753,22 +762,16 @@ void RenderWater(App* app)
     glUniform1i(glGetUniformLocation(waterProgram.handle, "refractionDepth"), 3);
 
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, app->normalMap);
+    glBindTexture(GL_TEXTURE_2D, app->textures[app->normalMap].handle); // Normal map
     glUniform1i(glGetUniformLocation(waterProgram.handle, "normalMap"), 4);
 
     glActiveTexture(GL_TEXTURE5);
-    glBindTexture(GL_TEXTURE_2D, app->dudvMap);
+    glBindTexture(GL_TEXTURE_2D, app->textures[app->dudvMap].handle); // Dudv map
     glUniform1i(glGetUniformLocation(waterProgram.handle, "dudvMap"), 5);
 
     // Configurar otros uniformes
-    glUniform2f(glGetUniformLocation(waterProgram.handle, "viewportSize"),
-        app->displaySize.x, app->displaySize.y);
+    glUniform2f(glGetUniformLocation(waterProgram.handle, "viewportSize"),(float)app->displaySize.x, (float)app->displaySize.y);
     glUniform1f(glGetUniformLocation(waterProgram.handle, "time"), app->time);
-
-    // Configurar matrices
-    glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "viewMatrix"), 1, GL_FALSE, &app->worldCamera.ViewMatrix[0][0]);
-    glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "viewMatrixInv"), 1, GL_FALSE, &glm::inverse(app->worldCamera.ViewMatrix)[0][0]);
-    glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "projectionMatrixInv"), 1, GL_FALSE, &glm::inverse(app->worldCamera.ProjectionMatrix)[0][0]);
 
     // Renderizar el agua
     for (const auto& entity : app->entities)
@@ -876,40 +879,46 @@ void Render(App* app)
 
         case Mode_Deferred_Geometry:
         {
-            // 1. Renderizar escena de reflexión
+            // 1. Renderizar reflexión
             glBindFramebuffer(GL_FRAMEBUFFER, app->reflectionFBO.handle);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+            // Configurar cámara de reflexión
             Camera reflectionCamera = app->worldCamera;
-            reflectionCamera.Position.y = -reflectionCamera.Position.y;
-            reflectionCamera.Front.y = -reflectionCamera.Front.y;
+            reflectionCamera.Position.y = -reflectionCamera.Position.y; // Invertir posición Y
+            reflectionCamera.Front.y = -reflectionCamera.Front.y;      // Invertir dirección Y (equivalente a pitch negativo)
             reflectionCamera.ViewMatrix = glm::lookAt(reflectionCamera.Position,
                 reflectionCamera.Position + reflectionCamera.Front,
                 reflectionCamera.Up);
 
+            // Renderizar escena con plano de recorte para reflexión
             glm::mat4 reflectionVP = reflectionCamera.ProjectionMatrix * reflectionCamera.ViewMatrix;
             UpdateEntitiesWithVP(app, reflectionVP);
-            RenderSceneWithClipPlane(app, glm::vec4(0, 1, 0, 0));
+            RenderSceneWithClipPlane(app, glm::vec4(0, 1, 0, 0)); // Plano de recorte para reflexión
 
-            // 2. Renderizar escena de refracción
+            // 2. Renderizar refracción
             glBindFramebuffer(GL_FRAMEBUFFER, app->refractionFBO.handle);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix);
-            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0));
+            // Usar cámara normal para refracción
+            glm::mat4 refractionVP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
+            UpdateEntitiesWithVP(app, refractionVP);
+            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0)); // Plano de recorte para refracción
 
-            // 3. Renderizar escena principal al FBO primario
+            // 3. Renderizar escena principal
             glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+            // Configurar múltiples render targets si es necesario
             std::vector<GLuint> textures;
             for (auto& it : app->primaryFBO.attachments) {
                 textures.push_back(it.second);
             }
             glDrawBuffers(textures.size(), textures.data());
 
+            // Renderizar escena normal sin plano de recorte (o con uno muy lejano)
             UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix);
-            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0)); // Plano de recorte lejano
+            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
 
             // 4. Renderizar el agua
             RenderWater(app);
