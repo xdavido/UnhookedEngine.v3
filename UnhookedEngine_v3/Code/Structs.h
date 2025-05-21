@@ -293,6 +293,7 @@ struct App
     //Water Textures
     u32 dudvMap;
     u32 normalMap;
+    u32 foamMap;
 
     //Modelo 3D cargado
     u32 BaseIdx;
@@ -334,7 +335,7 @@ struct App
     FrameBuffer reflectionFBO;
     FrameBuffer refractionFBO;
 
-    float waterTileSize = 8.0f;
+    float waterTileSize = 10.0f;
     // Uniform location para el plano de recorte (usado en reflection/refraction)
     GLint clipPlaneUniformLoc;
 

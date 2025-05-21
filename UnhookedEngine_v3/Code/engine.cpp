@@ -317,8 +317,13 @@ void Init(App* app)
     app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
 
     app->waterModelIdx = LoadModel(app, "Island/Water.obj");
-    app->dudvMap = LoadTexture2D(app,"Island/dudvmap.png" );
-    app->normalMap = LoadTexture2D(app, "Island/normalmap.png");
+
+  /*  app->dudvMap = LoadTexture2D(app,"Island/dudvmap.png" );
+    app->normalMap = LoadTexture2D(app, "Island/normalmap.png");*/
+    app->dudvMap = LoadTexture2D(app, "Island/dudvmap2.jpg");
+    app->normalMap = LoadTexture2D(app, "Island/normalmap2.jpg");
+
+    app->foamMap = LoadTexture2D(app, "Island/foamMap.png");
 
     app->BaseIdx = LoadModel(app, "Island/Base.obj");
     app->SculptIdx = LoadModel(app, "Island/Sculpt.obj");
@@ -777,6 +782,10 @@ void RenderWater(App* app)
     glActiveTexture(GL_TEXTURE5);
     glBindTexture(GL_TEXTURE_2D, app->textures[app->dudvMap].handle); // Dudv map
     glUniform1i(glGetUniformLocation(waterProgram.handle, "dudvMap"), 5);
+
+    glActiveTexture(GL_TEXTURE6);
+    glBindTexture(GL_TEXTURE_2D, app->textures[app->foamMap].handle);
+    glUniform1i(glGetUniformLocation(waterProgram.handle, "foamMap"), 6);
 
     // Configurar otros uniformes
     glUniform2f(glGetUniformLocation(waterProgram.handle, "viewportSize"),(float)app->displaySize.x, (float)app->displaySize.y);
