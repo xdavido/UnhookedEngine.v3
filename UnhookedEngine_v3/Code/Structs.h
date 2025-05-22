@@ -294,6 +294,7 @@ struct App
     u32 dudvMap;
     u32 normalMap;
     u32 foamMap;
+    u32 causticsMap;
     u32 skyboxMap;
 
     //Modelo 3D cargado
