@@ -192,8 +192,10 @@ void main()
 {
     vTexCoord = aTexCoord;
     vPosition = vec3(uWorldMatrix * vec4(aPosition,1.0));
-    vNormals = vec3(uWorldMatrix * vec4(aNormal, 0.0));
-    vViewDir = uCameraPosition - vPosition;
+     mat3 normalMatrix = transpose(inverse(mat3(uWorldMatrix)));
+    vNormals = normalize(normalMatrix * aNormal);
+
+   vViewDir = normalize(uCameraPosition - vPosition);
 
     vec4 worldPos = uWorldMatrix * vec4(aPosition, 1.0);
     gl_ClipDistance[0] = dot(worldPos, uClipPlane);
@@ -220,9 +222,11 @@ layout(location=3) out vec4 oViewDir;
 void main()
 {
     oAlbedo = texture(uTexture, vTexCoord);
-    oNormals = vec4(vNormals, 1.0);
+    oNormals = vec4(vNormals, 1.0); 
     oPosition = vec4(vPosition, 1.0);
     oViewDir = vec4(vViewDir, 1.0);
+
+
 }
 
 
