@@ -46,7 +46,8 @@ void main()
     vViewDir = uCameraPosition - vPosition;
 
     vec4 worldPos = uWorldMatrix * vec4(aPosition, 1.0);
-    gl_ClipDistance[0] = dot(worldPos, uClipPlane);
+   vec4 clipDistance = vec4 (0.0,0.0,0.0, length(vPosition) / 100.0);
+   gl_ClipDistance[0] = dot(worldPos, uClipPlane + clipDistance);
 
     gl_Position = uWorldViewProjectionMatrix * vec4(aPosition,1.0);
    

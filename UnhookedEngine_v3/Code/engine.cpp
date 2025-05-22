@@ -324,6 +324,8 @@ void Init(App* app)
     app->normalMap = LoadTexture2D(app, "Island/normalmap2.jpg");
 
     app->foamMap = LoadTexture2D(app, "Island/foamMap.png");
+    app->causticsMap = LoadTexture2D(app, "Island/causticsmap.jpg");
+
 
     app->BaseIdx = LoadModel(app, "Island/Base.obj");
     app->SculptIdx = LoadModel(app, "Island/Sculpt.obj");
@@ -332,14 +334,14 @@ void Init(App* app)
     app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
 
 
-    app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT_DEFERRED");
+    app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT");
     
     //Camera
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
     
     app->worldCamera.ProjectionMatrix = glm::perspective(glm::radians(60.f), aspectRatio, app->worldCamera.nearPlane, app->worldCamera.farPlane);
-    app->worldCamera.Position = vec3(35, 25, 40); //Alejada hacia la derecha
-    app->worldCamera.Front = glm::vec3(-0.7f, -0.3f, -1.0f); // Apuntando ligeramente hacia abajo y a la izquierda
+    app->worldCamera.Position = vec3(0, 7, 15); //Alejada hacia la derecha
+    app->worldCamera.Front = glm::vec3(0.0f, -0.3f, -1.0f); // Apuntando ligeramente hacia abajo
     app->worldCamera.ViewMatrix = glm::lookAt(app->worldCamera.Position, app->worldCamera.Position + app->worldCamera.Front, app->worldCamera.Up);
     
     glm::mat4 VP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
@@ -352,12 +354,12 @@ void Init(App* app)
 
     //Lights
     app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0.5,0.9), vec3(-1,-1,1),vec3(0)});
-    app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0.09,0.05), vec3(1,-1,-1),vec3(0)});
+    app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0.09,0.05), vec3(1,0.2,0.8),vec3(0)});
 
     //Sculpts Point Lights
-    app->lights.push_back({ LightType::Light_Point, vec3(0.9,0.5,0.15), vec3(-1,-1,1),vec3(-4.4,11.8,-2.3) }); 
-    app->lights.push_back({ LightType::Light_Point, vec3(0.9,0.5,0.15), vec3(-1,-1,1),vec3(-4.4,11.8,1.1) });
-    app->lights.push_back({ LightType::Light_Point,vec3(0.9,0.5,0.15), vec3(-1,-1,1),vec3(-3.1,17.2,-0.4) });
+    app->lights.push_back({ LightType::Light_Point, vec3(0.9,0.5,0.05), vec3(-1,-1,1),vec3(2.4,1.1,-1) }); 
+    app->lights.push_back({ LightType::Light_Point, vec3(0.7,0.5,0.15), vec3(-1,-1,1),vec3(0.2,3.5,0.1) });
+    //app->lights.push_back({ LightType::Light_Point,vec3(0.7,0.5,0.15), vec3(-1,-1,1),vec3(1.4,1.1,-0.4) });
 
 
     UpdateLights(app);
@@ -439,7 +441,7 @@ void Gui(App* app)
 
         app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_QUAD_DEFERRED" : "RENDER_QUAD_FORWARD");
         app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_GEOMETRY_DEFERRED" : "RENDER_GEOMETRY_FORWARD");
-        app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", app->mode == Mode_Deferred_Geometry ? "WATER_EFFECT_DEFERRED" : "WATER_EFFECT_FORWARD");
+        app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT");
 
 
         app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
@@ -715,6 +717,11 @@ void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane)
         glUniform4fv(clipPlaneLoc, 1, glm::value_ptr(clipPlane));
     }
 
+    /* glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, app->textures[app->causticsMap].handle);
+    glUniform1i(glGetUniformLocation(geometryProgram.handle, "causticsMap"), 0);
+    glEnable(GL_CLIP_DISTANCE0);*/
+
     glEnable(GL_CLIP_DISTANCE0);
 
     // Configurar UBOs
@@ -777,12 +784,12 @@ void RenderWater(App* app)
     if (app->mode == Mode_Deferred_Geometry)
     {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, app->reflectionFBO.handle);
+        glBindTexture(GL_TEXTURE_2D, app->reflectionFBO.attachments[0].second);
         glUniform1i(glGetUniformLocation(waterProgram.handle, "reflectionMap"), 0);
 
 
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, app->refractionFBO.handle);
+        glBindTexture(GL_TEXTURE_2D, app->refractionFBO.attachments[0].second);
         glUniform1i(glGetUniformLocation(waterProgram.handle, "refractionMap"), 1);
     }
     else
@@ -816,6 +823,8 @@ void RenderWater(App* app)
     glActiveTexture(GL_TEXTURE6);
     glBindTexture(GL_TEXTURE_2D, app->textures[app->foamMap].handle);
     glUniform1i(glGetUniformLocation(waterProgram.handle, "foamMap"), 6);
+
+
 
     glUniform2f(glGetUniformLocation(waterProgram.handle, "viewportSize"), (float)app->displaySize.x, (float)app->displaySize.y);
     glUniform1f(glGetUniformLocation(waterProgram.handle, "time"), app->time);

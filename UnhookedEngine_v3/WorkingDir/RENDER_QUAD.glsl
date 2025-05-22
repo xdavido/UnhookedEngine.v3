@@ -34,7 +34,7 @@ void main()
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef RENDER_QUAD_DEFERRED_LIGHT
+#ifdef RENDER_QUAD_DEFERRED
 
 #if defined(VERTEX) ////////////////////////////////////////
 
@@ -197,96 +197,6 @@ void main()
             break;
     }
 
-}
-
-#endif
-#endif
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef RENDER_QUAD_DEFERRED
-
-#if defined(VERTEX) ////////////////////////////////////////
-
-layout(location=0) in vec3 aPosition;
-layout(location=1) in vec2 aTexCoord;
-
-out vec2 vTexCoord;
-
-void main()
-{
-    vTexCoord = aTexCoord;
-    gl_Position = vec4(aPosition, 1.0);
-}
-
-#elif defined(FRAGMENT) ////////////////////////////////////////
-
-in vec2 vTexCoord;
-
-uniform sampler2D uAlbedo;
-uniform sampler2D uNormals;
-uniform sampler2D uPosition;
-uniform sampler2D uViewDir;
-uniform sampler2D uDepth;
-
-uniform float near = 0.1;
-uniform float far = 100.0;
-uniform int uDisplayMode;
-uniform bool uInvertDepth;
-
-layout(location=0) out vec4 oColor;
-
-void main()
-{
-    float depth = texture(uDepth, vTexCoord).r;
-
-    if (depth >= 1.0 - 1e-5) // Fondo sin geometría
-    {
-        oColor = vec4(0.0, 0.0, 0.0, 1.0);
-        return;
-    }
-
-    vec3 Albedo = texture(uAlbedo, vTexCoord).rgb;
-    vec3 Normal = normalize(texture(uNormals, vTexCoord).xyz);
-    vec3 Position = texture(uPosition, vTexCoord).xyz;
-    vec3 ViewDir = normalize(texture(uViewDir, vTexCoord).xyz);
-
-    switch (uDisplayMode)
-    {
-        case 0: // Muestra albedo
-            oColor = vec4(Albedo, 1.0);
-            break;
-
-        case 1: // Muestra normales
-            oColor = vec4(Normal, 1.0);
-            break;
-
-        case 2: // Muestra posición
-            oColor = vec4(Position, 1.0);
-            break;
-
-        case 3: // Muestra dirección de vista
-            oColor = vec4(ViewDir, 1.0);
-            break;
-
-        case 4: // Profundidad lineal
-        {
-            float z = depth * 2.0 - 1.0;
-            float linearDepth = (2.0 * near * far) / (far + near - z * (far - near));
-            float normalized = clamp(linearDepth / far, 0.0, 1.0);
-
-            if (uInvertDepth)
-                normalized = 1.0 - normalized;
-
-            oColor = vec4(vec3(normalized), 1.0);
-        }
-            break;
-
-        default:
-            oColor = vec4(1.0, 0.0, 1.0, 1.0); // Magenta para error
-            break;
-    }
 }
 
 #endif
