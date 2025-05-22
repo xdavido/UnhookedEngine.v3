@@ -380,8 +380,8 @@ void Init(App* app)
     app->mode = Mode_Deferred_Geometry;
     app->primaryFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y);
 
-    app->reflectionFBO.CreateFBO(1, app->displaySize.x, app->displaySize.y);
-    app->refractionFBO.CreateFBO(1, app->displaySize.x, app->displaySize.y);
+    app->reflectionFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y);
+    app->refractionFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y);
 
 }
 
@@ -773,13 +773,29 @@ void RenderWater(App* app)
     glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "projectionMatrixInv"), 1, GL_FALSE, &glm::inverse(projectionMatrix)[0][0]);
 
     // Configurar texturas
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, app->reflectionFBO.attachments[0].second);
-    glUniform1i(glGetUniformLocation(waterProgram.handle, "reflectionMap"), 0);
 
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, app->refractionFBO.attachments[0].second);
-    glUniform1i(glGetUniformLocation(waterProgram.handle, "refractionMap"), 1);
+    if (app->mode == Mode_Deferred_Geometry)
+    {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, app->reflectionFBO.handle);
+        glUniform1i(glGetUniformLocation(waterProgram.handle, "reflectionMap"), 0);
+
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, app->refractionFBO.handle);
+        glUniform1i(glGetUniformLocation(waterProgram.handle, "refractionMap"), 1);
+    }
+    else
+    {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, app->reflectionFBO.attachments[0].second);
+        glUniform1i(glGetUniformLocation(waterProgram.handle, "reflectionMap"), 0);
+
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, app->refractionFBO.attachments[0].second);
+        glUniform1i(glGetUniformLocation(waterProgram.handle, "refractionMap"), 1);
+    }
 
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, app->reflectionFBO.depthHandle);
@@ -928,6 +944,7 @@ void Render(App* app)
         {
 
             RenderSceneWithClipPlane(app, glm::vec4(0, 1, 0, 0)); // Plano de recorte para reflexión
+            RenderScreenFillQuad(app, app->reflectionFBO);
 
             // 2. Renderizar refracción
             glBindFramebuffer(GL_FRAMEBUFFER, app->refractionFBO.handle);
@@ -936,13 +953,16 @@ void Render(App* app)
             // Usar cámara normal para refracción
             glm::mat4 refractionVP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
             UpdateEntitiesWithVP(app, refractionVP);
+           
             RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0)); // Plano de recorte para refracción
+            RenderScreenFillQuad(app, app->refractionFBO);
 
             // 3. Renderizar escena principal
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // Configurar múltiples render targets si es necesario
+            //// Configurar múltiples render targets si es necesario
             std::vector<GLuint> textures;
             for (auto& it : app->primaryFBO.attachments) {
                 textures.push_back(it.second);
@@ -957,7 +977,6 @@ void Render(App* app)
             RenderWater(app);
             
             // 5. Renderizar el quad final
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
             RenderScreenFillQuad(app, app->primaryFBO);
 
         }
