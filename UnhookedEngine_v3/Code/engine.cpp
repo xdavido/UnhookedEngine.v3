@@ -424,6 +424,17 @@ void Gui(App* app)
     ImGui::Text(" Render Mode");
     if (ImGui::Button(app->mode == Mode_Forward_Geometry ? " Switch to Deferred" : " Switch to Forward", ImVec2(220, 35)))
     {
+
+        for (auto& program : app->programs)
+        {
+            if (program.handle != 0)
+            {
+                glDeleteProgram(program.handle);
+                program.handle = 0;
+            }
+        }
+        app->programs.clear();
+
         app->mode = (app->mode == Mode_Forward_Geometry) ? Mode_Deferred_Geometry : Mode_Forward_Geometry;
 
         app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_QUAD_DEFERRED" : "RENDER_QUAD_FORWARD");
@@ -798,12 +809,6 @@ void RenderWater(App* app)
     for (const auto& entity : app->entities)
     {
         if (entity.modelIndex != app->waterModelIdx) continue;
-
-        /*if (app->mode == Mode_Forward_Geometry)
-        {
-            glUniformMatrix4fv(glGetUniformLocation(waterProgram.handle, "worldViewMatrix"), 1, GL_FALSE, &(app->worldCamera.ViewMatrix[0][0] * entity.worldMatrix)[0][0]);
-        }
-        */
         
         glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
         
@@ -842,34 +847,8 @@ void Render(App* app)
     // Renderizar escena con plano de recorte para reflexión
     glm::mat4 reflectionVP = reflectionCamera.ProjectionMatrix * reflectionCamera.ViewMatrix;
     UpdateEntitiesWithVP(app, reflectionVP);
-    RenderSceneWithClipPlane(app, glm::vec4(0, 1, 0, 0)); // Plano de recorte para reflexión
-
-    // 2. Renderizar refracción
-    glBindFramebuffer(GL_FRAMEBUFFER, app->refractionFBO.handle);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // Usar cámara normal para refracción
-    glm::mat4 refractionVP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
-    UpdateEntitiesWithVP(app, refractionVP);
-    RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0)); // Plano de recorte para refracción
-
-    // 3. Renderizar escena principal
-    glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // Configurar múltiples render targets si es necesario
-    std::vector<GLuint> textures;
-    for (auto& it : app->primaryFBO.attachments) {
-        textures.push_back(it.second);
-    }
-    glDrawBuffers(textures.size(), textures.data());
-
-    // Renderizar escena normal sin plano de recorte (o con uno muy lejano)
-    UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix);
-    RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
-
-    // 4. Renderizar el agua
-    RenderWater(app);
+    
+    
 
     switch (app->mode)
     {
@@ -905,43 +884,42 @@ void Render(App* app)
 
         case Mode_Forward_Geometry:
         {
-          /*  glClearColor(0.0, 0.0, 0.0, 0.0);
+            glClearColor(0.0, 0.0, 0.0, 0.0);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            glViewport(0, 0, app->displaySize.x, app->displaySize.y);*/
+            glViewport(0, 0, app->displaySize.x, app->displaySize.y);
 
-            //// Primero renderizar la escena normal
-            //Program& geometryProgram = app->programs[app->geometryProgramIdx];
-            //glUseProgram(geometryProgram.handle);
-            //glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
+            RenderSceneWithClipPlane(app, glm::vec4(0, 1, 0, 0)); // Plano de recorte para reflexión
 
-            //for (const auto& entity : app->entities)
-            //{
-            //    if (entity.modelIndex == app->waterModelIdx) continue; // Saltar el agua
+            // 2. Renderizar refracción
+            glBindFramebuffer(GL_FRAMEBUFFER, app->refractionFBO.handle);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            //    glBindBufferRange(GL_UNIFORM_BUFFER, 1, app->entityUBO.handle, entity.entityBufferOffset, entity.entityBufferSize);
-            //    Model& model = app->models[entity.modelIndex];
-            //    Mesh& mesh = app->meshes[model.meshIdx];
+            // Usar cámara normal para refracción
+            glm::mat4 refractionVP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
+            UpdateEntitiesWithVP(app, refractionVP);
+            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0)); // Plano de recorte para refracción
 
-            //    for (size_t i = 0; i < mesh.submeshes.size(); ++i)
-            //    {
-            //        GLuint vao = FindVAO(mesh, i, geometryProgram);
-            //        glBindVertexArray(vao);
+            // 3. Renderizar escena principal
+            glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            //        u32 submeshMaterialIdx = model.materialIdx[i];
-            //        Material& submeshMaterial = app->materials[submeshMaterialIdx];
+            // Configurar múltiples render targets si es necesario
+           /* std::vector<GLuint> textures;
+            for (auto& it : app->primaryFBO.attachments) {
+                textures.push_back(it.second);
+            }
+            glDrawBuffers(textures.size(), textures.data());*/
 
-            //        glActiveTexture(GL_TEXTURE0);
-            //        glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
-            //        glUniform1i(app->ModelTextureUniform, 0);
+            // Renderizar escena normal sin plano de recorte (o con uno muy lejano)
+            UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix);
 
-            //        SubMesh& submesh = mesh.submeshes[i];
-            //        glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
-
-            //        glBindTexture(GL_TEXTURE_2D, 0);
-            //    }
-            //}
-            
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
+
+            // 4. Renderizar el agua
+            RenderWater(app);
+
 
         }
         break;
@@ -949,10 +927,39 @@ void Render(App* app)
         case Mode_Deferred_Geometry:
         {
 
+            RenderSceneWithClipPlane(app, glm::vec4(0, 1, 0, 0)); // Plano de recorte para reflexión
+
+            // 2. Renderizar refracción
+            glBindFramebuffer(GL_FRAMEBUFFER, app->refractionFBO.handle);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            // Usar cámara normal para refracción
+            glm::mat4 refractionVP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
+            UpdateEntitiesWithVP(app, refractionVP);
+            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0)); // Plano de recorte para refracción
+
+            // 3. Renderizar escena principal
+            glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            // Configurar múltiples render targets si es necesario
+            std::vector<GLuint> textures;
+            for (auto& it : app->primaryFBO.attachments) {
+                textures.push_back(it.second);
+            }
+            glDrawBuffers(textures.size(), textures.data());
+
+            // Renderizar escena normal sin plano de recorte (o con uno muy lejano)
+            UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix* app->worldCamera.ViewMatrix);
+            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
+
+            // 4. Renderizar el agua
+            RenderWater(app);
             
             // 5. Renderizar el quad final
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             RenderScreenFillQuad(app, app->primaryFBO);
+
         }
         break;
 
@@ -990,7 +997,6 @@ void CleanUp(App* app)
         glDeleteBuffers(1, &app->embeddedElements);
         app->embeddedElements = 0;
     }
-
 
 }
 
