@@ -261,6 +261,11 @@ enum WaterScenePart {
     Refraction
 };
 
+enum SceneType {
+    Scene_Rocks,
+    Scene_Island
+};
+
 struct App
 {
     // Loop
@@ -300,6 +305,17 @@ struct App
     //Modelo 3D cargado
     u32 BaseIdx;
     u32 SculptIdx;
+
+    u32 GrassIdx;
+    u32 SandIdx;
+    u32 RocksIdx;
+    u32 ReddoIdx;
+    u32 MetalIdx;
+    u32 WoodIdx;
+    u32 WindowsIdx;
+    u32 StoneIdx;
+
+
     u32 waterModelIdx;
 
     u32 ModelTextureUniform;
@@ -343,7 +359,9 @@ struct App
 
     // Tiempo para animaciones
     float time = 0.0f;
-   
+
+    SceneType currentScene = Scene_Rocks; // Escena inicial
+
 };
 
 

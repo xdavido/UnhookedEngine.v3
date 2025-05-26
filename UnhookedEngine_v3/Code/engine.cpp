@@ -316,25 +316,34 @@ void Init(App* app)
     app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", "RENDER_QUAD_DEFERRED");
     app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
 
-    app->waterModelIdx = LoadModel(app, "Island/Water.obj");
+    app->waterModelIdx = LoadModel(app, "Water/Water.obj");
 
-  /*  app->dudvMap = LoadTexture2D(app,"Island/dudvmap.png" );
-    app->normalMap = LoadTexture2D(app, "Island/normalmap.png");*/
-    app->dudvMap = LoadTexture2D(app, "Island/dudvmap2.jpg");
-    app->normalMap = LoadTexture2D(app, "Island/normalmap2.jpg");
+    app->dudvMap = LoadTexture2D(app, "Water/dudvmap2.jpg");
+    app->normalMap = LoadTexture2D(app, "Water/normalmap2.jpg");
 
-    app->foamMap = LoadTexture2D(app, "Island/foamMap.png");
-    app->causticsMap = LoadTexture2D(app, "Island/causticsmap.jpg");
+    app->foamMap = LoadTexture2D(app, "Water/foamMap.png");
+    app->causticsMap = LoadTexture2D(app, "Water/causticsmap.jpg");
 
+    //Scene 1
+    app->BaseIdx = LoadModel(app, "Rocks/Base.obj");
+    app->SculptIdx = LoadModel(app, "Rocks/Sculpt.obj");
 
-    app->BaseIdx = LoadModel(app, "Island/Base.obj");
-    app->SculptIdx = LoadModel(app, "Island/Sculpt.obj");
+    //Scene 2
+    app->SandIdx = LoadModel(app, "Island/Sand.obj");
+    app->GrassIdx = LoadModel(app, "Island/Grass.obj");
+    app->RocksIdx = LoadModel(app, "Island/Rocks.obj");
+    app->ReddoIdx  =LoadModel(app, "Island/Reddo.obj");
+    app->MetalIdx  =LoadModel(app, "Island/Metal.obj");
+    app->WoodIdx =LoadModel(app, "Island/Wood.obj");
+    app->WindowsIdx  =LoadModel(app, "Island/Windows.obj");
+    app->StoneIdx  =LoadModel(app, "Island/Stone.obj");
+
 
     app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY_DEFERRED");
     app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
 
 
-    app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT");
+    app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT_DEFERRED");
     
     //Camera
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
@@ -352,32 +361,27 @@ void Init(App* app)
     app->globalUBO = CreateConstantBuffer(app->maxUniformBufferSize);
     app->entityUBO = CreateConstantBuffer(app->maxUniformBufferSize);
 
-    //Lights
-    app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0.5,0.9), vec3(-1,-1,1),vec3(0)});
-    app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0.09,0.05), vec3(1,0.2,0.8),vec3(0)});
-
-    //Sculpts Point Lights
-    app->lights.push_back({ LightType::Light_Point, vec3(0.9,0.5,0.05), vec3(-1,-1,1),vec3(2.4,1.1,-1) }); 
-    app->lights.push_back({ LightType::Light_Point, vec3(0.7,0.5,0.15), vec3(-1,-1,1),vec3(0.2,3.5,0.1) });
-    //app->lights.push_back({ LightType::Light_Point,vec3(0.7,0.5,0.15), vec3(-1,-1,1),vec3(1.4,1.1,-0.4) });
+    app->currentScene = Scene_Rocks;
 
 
+    // Luces para Rocks
+    app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0.5,0.9), vec3(-1,-1,1), vec3(0) });
+    app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0.09,0.05), vec3(1,0.2,0.8), vec3(0) });
+    app->lights.push_back({ LightType::Light_Point, vec3(0.9,0.5,0.05), vec3(-1,-1,1), vec3(2.4,1.1,-1) });
+    app->lights.push_back({ LightType::Light_Point, vec3(0.7,0.5,0.15), vec3(-1,-1,1), vec3(0.2,3.5,0.1) });
+
+
+    MapBuffer(app->entityUBO, GL_WRITE_ONLY);
+
+    // Entidades para Rocks
+    CreateEntity(app, app->BaseIdx, VP, vec3(0));
+    CreateEntity(app, app->SculptIdx, VP, vec3(0));
+
+    CreateEntity(app, app->waterModelIdx, VP, vec3(0));
+
+    // Actualizar buffers
+    UnmapBuffer(app->entityUBO);
     UpdateLights(app);
-
-    //Entities Buffer
-    Buffer& entityUBO = app->entityUBO;
-    MapBuffer(entityUBO, GL_WRITE_ONLY);
-
-    glm::vec3 position = { 0, 0, 0 };
-
-    //Geometry Plane
-    CreateEntity(app, app->BaseIdx, VP, position);
-    CreateEntity(app, app->SculptIdx, VP, position);
-    CreateEntity(app, app->waterModelIdx, VP, position);
-
- 
-
-    UnmapBuffer(entityUBO);
 
     app->mode = Mode_Deferred_Geometry;
     app->primaryFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y);
@@ -421,6 +425,64 @@ void Gui(App* app)
     }
 
     ImGui::Spacing();
+    if (ImGui::Button(app->currentScene == Scene_Rocks ? " Switch to Island Scene" : " Switch to Rocks Scene", ImVec2(220, 35)))
+    {
+        // Limpiar entidades y luces actuales
+        app->entities.clear();
+        app->lights.clear();
+
+        // Resetear el buffer de entidades
+        app->entityUBO.head = 0;
+        MapBuffer(app->entityUBO, GL_WRITE_ONLY);
+
+        // Crear nuevas entidades y luces según la escena seleccionada
+        glm::mat4 VP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
+        glm::vec3 position = { 0, 0, 0 };
+
+        if (app->currentScene == Scene_Rocks)
+        {
+            // Cambiar a escena Island
+            app->currentScene = Scene_Island;
+
+            // Luces para Island
+            app->lights.push_back({ LightType::Light_Directional, vec3(1.0), vec3(-1,-1,-1), vec3(0) });
+            app->lights.push_back({ LightType::Light_Directional, vec3(1.0,0.8,0.4), vec3(-1,-0.35,0.35), vec3(0) });
+
+
+            // Entidades para Island
+            CreateEntity(app, app->SandIdx, VP, position);
+            CreateEntity(app, app->GrassIdx, VP, position);
+            CreateEntity(app, app->RocksIdx, VP, position);
+            CreateEntity(app, app->ReddoIdx, VP, position);
+            CreateEntity(app, app->MetalIdx, VP, position);
+            CreateEntity(app, app->WindowsIdx, VP, position);
+            CreateEntity(app, app->WoodIdx, VP, position);
+            CreateEntity(app, app->StoneIdx, VP, position);
+        }
+        else
+        {
+            // Cambiar a escena Rocks
+            app->currentScene = Scene_Rocks;
+
+            // Luces para Rocks
+            app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0.5,0.9), vec3(-1,-1,1), vec3(0) });
+            app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0.09,0.05), vec3(1,0.2,0.8), vec3(0) });
+            app->lights.push_back({ LightType::Light_Point, vec3(0.9,0.5,0.05), vec3(-1,-1,1), vec3(2.4,1.1,-1) });
+            app->lights.push_back({ LightType::Light_Point, vec3(0.7,0.5,0.15), vec3(-1,-1,1), vec3(0.2,3.5,0.1) });
+
+            // Entidades para Rocks
+            CreateEntity(app, app->BaseIdx, VP, position);
+            CreateEntity(app, app->SculptIdx, VP, position);
+        }
+
+        // Añadir agua a ambas escenas
+        CreateEntity(app, app->waterModelIdx, VP, position);
+
+        // Actualizar buffers
+        UnmapBuffer(app->entityUBO);
+        UpdateLights(app);
+    }
+    ImGui::Spacing();
 
     // Modo Rendering
     ImGui::Text(" Render Mode");
@@ -441,7 +503,7 @@ void Gui(App* app)
 
         app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_QUAD_DEFERRED" : "RENDER_QUAD_FORWARD");
         app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_GEOMETRY_DEFERRED" : "RENDER_GEOMETRY_FORWARD");
-        app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT");
+        app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", app->mode == Mode_Deferred_Geometry ? "WATER_EFFECT_DEFERRED" : "WATER_EFFECT_FORWARD");
 
 
         app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
@@ -717,16 +779,10 @@ void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane)
         glUniform4fv(clipPlaneLoc, 1, glm::value_ptr(clipPlane));
     }
 
-    /* glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, app->textures[app->causticsMap].handle);
-    glUniform1i(glGetUniformLocation(geometryProgram.handle, "causticsMap"), 0);
-    glEnable(GL_CLIP_DISTANCE0);*/
 
     glEnable(GL_CLIP_DISTANCE0);
 
-    // Configurar UBOs
-    //glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
-
+  
     // Renderizar todas las entidades excepto el agua
     for (const auto& entity : app->entities)
     {
@@ -784,7 +840,7 @@ void RenderWater(App* app)
     if (app->mode == Mode_Deferred_Geometry)
     {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, app->reflectionFBO.attachments[0].second);
+        glBindTexture(GL_TEXTURE_2D, app->primaryFBO.attachments[0].second);
         glUniform1i(glGetUniformLocation(waterProgram.handle, "reflectionMap"), 0);
 
 
@@ -934,12 +990,6 @@ void Render(App* app)
             glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // Configurar múltiples render targets si es necesario
-           /* std::vector<GLuint> textures;
-            for (auto& it : app->primaryFBO.attachments) {
-                textures.push_back(it.second);
-            }
-            glDrawBuffers(textures.size(), textures.data());*/
 
             // Renderizar escena normal sin plano de recorte (o con uno muy lejano)
             UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix);
@@ -970,6 +1020,7 @@ void Render(App* app)
             UpdateEntitiesWithVP(app, refractionVP);
            
             RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0)); // Plano de recorte para refracción
+
             RenderScreenFillQuad(app, app->refractionFBO);
 
             // 3. Renderizar escena principal
