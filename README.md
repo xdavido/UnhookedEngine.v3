@@ -37,4 +37,9 @@ El motor permite probar distintos tipos de luces, tanto estáticas como dinámic
 
 Ambos tipos de luz se configuran inicialmente en la función **Init()**, pero pueden ser editados y modificados en tiempo real utilizando **ImGui** 🛠️.
 
+### Asseets de terceros
+
+ [**Scene1 FBX - will.nsq**](https://sketchfab.com/will.nsq)
+ 
+ [**Scene2 FBX - ferofluid**](https://sketchfab.com/ferofluid)
 
