@@ -725,7 +725,7 @@ void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane)
     glEnable(GL_CLIP_DISTANCE0);
 
     // Configurar UBOs
-    glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
+    //glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
 
     // Renderizar todas las entidades excepto el agua
     for (const auto& entity : app->entities)
@@ -864,10 +864,16 @@ void Render(App* app)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Configurar cámara de reflexión
+   // Configurar cámara de reflexión
     Camera reflectionCamera = app->worldCamera;
     reflectionCamera.Position.y = -reflectionCamera.Position.y; // Invertir posición Y
-    reflectionCamera.Front.y = -reflectionCamera.Front.y;      // Invertir dirección Y (equivalente a pitch negativo)
-    reflectionCamera.ViewMatrix = glm::lookAt(reflectionCamera.Position, reflectionCamera.Position + reflectionCamera.Front,reflectionCamera.Up);
+    reflectionCamera.Front.y = -reflectionCamera.Front.y;      // Invertir dirección Y
+
+    // Recalcular Right y Up para la reflexión
+    reflectionCamera.Right = glm::normalize(glm::cross(reflectionCamera.Front, glm::vec3(0.0f, 1.0f, 0.0f)));
+    reflectionCamera.Up = glm::normalize(glm::cross(reflectionCamera.Right, reflectionCamera.Front));
+
+    reflectionCamera.ViewMatrix = glm::lookAt(reflectionCamera.Position, reflectionCamera.Position + reflectionCamera.Front, reflectionCamera.Up);
 
     // Renderizar escena con plano de recorte para reflexión
     glm::mat4 reflectionVP = reflectionCamera.ProjectionMatrix * reflectionCamera.ViewMatrix;
@@ -877,7 +883,7 @@ void Render(App* app)
 
     switch (app->mode)
     {
-        case Mode_Textured_Geometry: //modo textura en pantalla ( QUAD SHADER )
+        case Mode_Textured_Geometry: //modo textura en pantalla ( SCREEN TEXTURE SHADER )
         {
 
             glClearColor(0.0, 0.0, 0.0, 0.0);
