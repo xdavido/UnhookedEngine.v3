@@ -1,4 +1,4 @@
-# Blender 4.3.2 MTL File: 'Islands2.blend'
+# Blender 4.3.2 MTL File: 'None'
 # www.blender.org
 
 newmtl Material.023
@@ -8,6 +8,5 @@ Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
-illum 1
+illum 2
 map_Kd Material.023.png
-

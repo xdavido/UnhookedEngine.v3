@@ -218,6 +218,7 @@ struct FrameBuffer
         {
             glFramebufferTexture(GL_FRAMEBUFFER, it->first, it->second, 0);
         }
+
         glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthHandle, 0);
 
         //Check status

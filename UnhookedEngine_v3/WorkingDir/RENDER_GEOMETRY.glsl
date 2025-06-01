@@ -196,7 +196,7 @@ void main()
      mat3 normalMatrix = transpose(inverse(mat3(uWorldMatrix)));
     vNormals = normalize(normalMatrix * aNormal);
 
-   vViewDir = normalize(uCameraPosition - vPosition);
+    vViewDir = normalize(uCameraPosition - vPosition);
 
     vec4 worldPos = uWorldMatrix * vec4(aPosition, 1.0);
     gl_ClipDistance[0] = dot(worldPos, uClipPlane);

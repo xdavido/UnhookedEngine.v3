@@ -239,42 +239,46 @@ void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO)
 
     glViewport(0, 0, app->displaySize.x, app->displaySize.y);
 
-    Program& programTexturedGeometry = app->programs[app->texturedGeometryProgramIdx];
-    glUseProgram(programTexturedGeometry.handle);
+ 
 
-    glBindVertexArray(app->vao);
+        Program& programTexturedGeometry = app->programs[app->texturedGeometryProgramIdx];
+        glUseProgram(programTexturedGeometry.handle);
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
+        glBindVertexArray(app->vao);
 
-
-    GLint displayModeLoc = glGetUniformLocation(programTexturedGeometry.handle, "uDisplayMode");
-    glUniform1i(displayModeLoc, static_cast<int>(app->deferredDisplayMode));
-
-    GLint invertDepthLoc = glGetUniformLocation(programTexturedGeometry.handle, "uInvertDepth");
-    glUniform1i(invertDepthLoc, static_cast<int>(app->InverseDepth));
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
 
 
-    size_t iteration = 0;
+        GLint displayModeLoc = glGetUniformLocation(programTexturedGeometry.handle, "uDisplayMode");
+        glUniform1i(displayModeLoc, static_cast<int>(app->deferredDisplayMode));
 
-    const char* uniformNames[] = { "uAlbedo", "uNormals", "uPosition", "uViewDir" };
-    for (const auto& texture : aFBO.attachments)
-    {
-        GLint uniformPosition = glGetUniformLocation(programTexturedGeometry.handle, uniformNames[iteration]);
+        GLint invertDepthLoc = glGetUniformLocation(programTexturedGeometry.handle, "uInvertDepth");
+        glUniform1i(invertDepthLoc, static_cast<int>(app->InverseDepth));
 
+
+         size_t iteration = 0;
+
+
+        const char* uniformNames[] = { "uAlbedo", "uNormals", "uPosition", "uViewDir" };
+        for (const auto& texture : aFBO.attachments)
+        {
+            GLint uniformPosition = glGetUniformLocation(programTexturedGeometry.handle, uniformNames[iteration]);
+
+
+            glActiveTexture(GL_TEXTURE0 + iteration);
+            glBindTexture(GL_TEXTURE_2D, texture.second);
+            glUniform1i(uniformPosition, iteration);
+            ++iteration;
+        }
+    
+        GLint uniformPosition = glGetUniformLocation(programTexturedGeometry.handle, "uDepth");
         glActiveTexture(GL_TEXTURE0 + iteration);
-        glBindTexture(GL_TEXTURE_2D, texture.second);
+        glBindTexture(GL_TEXTURE_2D, aFBO.depthHandle);
         glUniform1i(uniformPosition, iteration);
-        ++iteration;
-    }
     
-    GLint uniformPosition = glGetUniformLocation(programTexturedGeometry.handle, "uDepth");
-    glActiveTexture(GL_TEXTURE0 + iteration);
-    glBindTexture(GL_TEXTURE_2D, aFBO.depthHandle);
-    glUniform1i(uniformPosition, iteration);
-    
-
+  
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
   
     glBindVertexArray(0);
@@ -840,7 +844,7 @@ void RenderWater(App* app)
     if (app->mode == Mode_Deferred_Geometry)
     {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, app->primaryFBO.attachments[0].second);
+        glBindTexture(GL_TEXTURE_2D, app->reflectionFBO.attachments[0].second);
         glUniform1i(glGetUniformLocation(waterProgram.handle, "reflectionMap"), 0);
 
 
@@ -880,7 +884,9 @@ void RenderWater(App* app)
     glBindTexture(GL_TEXTURE_2D, app->textures[app->foamMap].handle);
     glUniform1i(glGetUniformLocation(waterProgram.handle, "foamMap"), 6);
 
-
+    glActiveTexture(GL_TEXTURE7);
+    glBindTexture(GL_TEXTURE_2D, app->textures[app->causticsMap].handle);
+    glUniform1i(glGetUniformLocation(waterProgram.handle, "causticsMap"), 7);
 
     glUniform2f(glGetUniformLocation(waterProgram.handle, "viewportSize"), (float)app->displaySize.x, (float)app->displaySize.y);
     glUniform1f(glGetUniformLocation(waterProgram.handle, "time"), app->time);
@@ -1034,16 +1040,16 @@ void Render(App* app)
                 textures.push_back(it.second);
             }
             glDrawBuffers(textures.size(), textures.data());
-
             // Renderizar escena normal sin plano de recorte (o con uno muy lejano)
             UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix* app->worldCamera.ViewMatrix);
             RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
 
-            // 4. Renderizar el agua
+            // Renderizar el agua
             RenderWater(app);
-            
-            // 5. Renderizar el quad final
+
+            // FUNCION Renderizar el quad final juntando todos los FBO PERO SIN GENERAR LUCES
             RenderScreenFillQuad(app, app->primaryFBO);
+                   
 
         }
         break;
