@@ -299,21 +299,6 @@ void main()
 
 #elif defined(FRAGMENT) ////////////////////////////////////////
 
-struct Light
-{
-    unsigned int type;
-    vec3 color;
-    vec3 direction;
-    vec3 position;
-};
-
-layout(binding = 0, std140) uniform GlobalParams
-{
-    vec3 uCameraPosition;
-    unsigned int uLightCount;
-    Light uLight[16];
-};
-
 uniform vec2 viewportSize;
 uniform float time;
 uniform float tileSize; 
@@ -354,35 +339,6 @@ layout(location=3) out vec4 oViewDir;
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
-}
-
-
-vec3 CalcDirLight(Light alight, vec3 normal, vec3 viewDir)
-{
-    vec3 lightDir = normalize(mat3(viewMatrix) * (-alight.direction));
-    
-    vec3 reflectDir = reflect(-lightDir, normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 128.0);
-    vec3 specular = spec * alight.color * 0.6;
-    
-    return specular;
-}
-
-vec3 CalcPointLight(Light pointLight, vec3 normal, vec3 position, vec3 viewDir)
-{
-    vec3 lightPosView = vec3(viewMatrix * vec4(pointLight.position, 1.0));
-    vec3 lightDir = normalize(lightPosView - FSIn.positionViewspace);
-    float distance = length(lightPosView - FSIn.positionViewspace);
-
-    float radius = 20.0;
-    float attenuation = clamp(1.0 - distance*distance/(radius*radius), 0.0, 1.0);
-    attenuation *= attenuation;
-
-    vec3 reflectDir = reflect(-lightDir, normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 256.0);
-    vec3 specular = spec * pointLight.color * attenuation * 0.8;
-
-    return specular;
 }
 
 void main()

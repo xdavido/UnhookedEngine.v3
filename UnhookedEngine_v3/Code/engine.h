@@ -36,7 +36,7 @@ void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO);
 
 void RenderWater(App* app);
 
-void RenderSkybox(App* app);
+void RenderSkybox(App* app, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
 
 void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane);
 
