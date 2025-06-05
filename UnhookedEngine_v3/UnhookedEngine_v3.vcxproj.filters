@@ -118,5 +118,8 @@
     <None Include="WorkingDir\WATER_EFFECT.glsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="EQUIRECT_TO_CUBEMAP.glsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

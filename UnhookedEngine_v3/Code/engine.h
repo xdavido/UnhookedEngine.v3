@@ -38,3 +38,6 @@ void RenderWater(App* app);
 
 void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane);
 
+u32 ConvertHDRIToCubemap(App* app, const char* filepath);
+
+GLuint CreateCubeVAO();

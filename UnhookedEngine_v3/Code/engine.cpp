@@ -285,7 +285,122 @@ void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO)
     glUseProgram(0);
 }
 
+u32 ConvertHDRIToCubemap(App* app, const char* filepath)
+{
+    // 1. Cargar imagen HDR
+    Image hdr = {};
+    stbi_set_flip_vertically_on_load(true);
+    hdr.pixels = stbi_loadf(filepath, &hdr.size.x, &hdr.size.y, &hdr.nchannels, 0);
+    if (!hdr.pixels) {
+        ELOG("No se pudo cargar HDRI %s", filepath);
+        return 0;
+    }
 
+    GLuint hdrTexture;
+    glGenTextures(1, &hdrTexture);
+    glBindTexture(GL_TEXTURE_2D, hdrTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, hdr.size.x, hdr.size.y, 0, GL_RGB, GL_FLOAT, hdr.pixels);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    FreeImage(hdr);
+
+    // 2. Crear cubemap vacío
+    GLuint cubemapTex;
+    glGenTextures(1, &cubemapTex);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTex);
+    for (int i = 0; i < 6; ++i)
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    // 3. Cargar shader de conversión
+    u32 progIdx = LoadProgram(app, "EQUIRECT_TO_CUBEMAP.glsl", "EQUIRECT_TO_CUBEMAP");
+    Program& program = app->programs[progIdx];
+    glUseProgram(program.handle);
+
+    glUniform1i(glGetUniformLocation(program.handle, "equirectangularMap"), 0);
+
+    // 4. Matrices de vista (una por cara del cubo)
+    glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.f, 0.1f, 10.0f);
+    glm::mat4 captureViews[] = {
+        glm::lookAt(glm::vec3(0), glm::vec3(1, 0, 0), glm::vec3(0, -1, 0)),
+        glm::lookAt(glm::vec3(0), glm::vec3(-1, 0, 0), glm::vec3(0, -1, 0)),
+        glm::lookAt(glm::vec3(0), glm::vec3(0, 1, 0), glm::vec3(0, 0, 1)),
+        glm::lookAt(glm::vec3(0), glm::vec3(0, -1, 0), glm::vec3(0, 0, -1)),
+        glm::lookAt(glm::vec3(0), glm::vec3(0, 0, 1), glm::vec3(0, -1, 0)),
+        glm::lookAt(glm::vec3(0), glm::vec3(0, 0, -1), glm::vec3(0, -1, 0))
+    };
+
+    // 5. FBO
+    GLuint fbo, rbo;
+    glGenFramebuffers(1, &fbo);
+    glGenRenderbuffers(1, &rbo);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    // 6. Dibujar cubo en cada cara
+    glViewport(0, 0, 512, 512);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, hdrTexture);
+
+    GLuint cubeVAO = CreateCubeVAO(); // Necesitas una función que cree un cubo simple
+
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        glUniformMatrix4fv(glGetUniformLocation(program.handle, "view"), 1, GL_FALSE, glm::value_ptr(captureViews[i]));
+        glUniformMatrix4fv(glGetUniformLocation(program.handle, "projection"), 1, GL_FALSE, glm::value_ptr(captureProjection));
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cubemapTex, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glBindVertexArray(cubeVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDeleteRenderbuffers(1, &rbo);
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteTextures(1, &hdrTexture);
+    glUseProgram(0);
+
+    return cubemapTex;
+}
+
+GLuint CreateCubeVAO()
+{
+    float cubeVertices[] = {
+        // pos
+        -1, -1, -1,  1, -1, -1,  1,  1, -1,
+        -1, -1, -1,  1,  1, -1, -1,  1, -1,
+        -1, -1,  1,  1, -1,  1,  1,  1,  1,
+        -1, -1,  1,  1,  1,  1, -1,  1,  1,
+        -1,  1,  1,  1,  1,  1,  1,  1, -1,
+        -1,  1,  1,  1,  1, -1, -1,  1, -1,
+        -1, -1,  1,  1, -1,  1,  1, -1, -1,
+        -1, -1,  1,  1, -1, -1, -1, -1, -1,
+         1, -1,  1,  1,  1,  1,  1,  1, -1,
+         1, -1,  1,  1,  1, -1,  1, -1, -1,
+        -1, -1,  1, -1,  1,  1, -1,  1, -1,
+        -1, -1,  1, -1,  1, -1, -1, -1, -1
+    };
+
+    GLuint cubeVAO, cubeVBO;
+    glGenVertexArrays(1, &cubeVAO);
+    glGenBuffers(1, &cubeVBO);
+
+    glBindVertexArray(cubeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glBindVertexArray(0);
+
+    return cubeVAO;
+}
 
 void Init(App* app)
 {
@@ -327,6 +442,8 @@ void Init(App* app)
 
     app->foamMap = LoadTexture2D(app, "Water/foamMap.png");
     app->causticsMap = LoadTexture2D(app, "Water/causticsmap.jpg");
+
+    app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
 
     //Scene 1
     app->BaseIdx = LoadModel(app, "Rocks/Base.obj");
