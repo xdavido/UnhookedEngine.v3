@@ -52,6 +52,8 @@
     <ClInclude Include="ThirdParty\stb\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="WorkingDir\ENV_REFLECTION.glsl" />
+    <None Include="WorkingDir\ENV_REFRACTION.glsl" />
     <None Include="WorkingDir\EQUIRECT_TO_CUBEMAP.glsl" />
     <None Include="WorkingDir\RENDER_GEOMETRY.glsl" />
     <None Include="WorkingDir\RENDER_QUAD.glsl" />

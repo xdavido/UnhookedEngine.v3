@@ -124,5 +124,11 @@
     <None Include="WorkingDir\SKYBOX.glsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="WorkingDir\ENV_REFRACTION.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="WorkingDir\ENV_REFLECTION.glsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

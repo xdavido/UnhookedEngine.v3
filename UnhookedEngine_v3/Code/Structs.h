@@ -316,12 +316,18 @@ struct App
     u32 WindowsIdx;
     u32 StoneIdx;
     u32 SkyBoxIdx;
+    u32 refractionProgramIdx;
+    u32 reflectionProgramIdx;
 
     u32 waterModelIdx;
 
     u32 ModelTextureUniform;
     u32 planeIdx;
 
+    GLuint vaoRefractionCube = 0;
+    GLuint vboRefractionCube = 0;
+    GLuint iboRefractionCube = 0;
+    u32 refractionCubeIndexCount = 0;
 
     // Mode
     Mode mode;

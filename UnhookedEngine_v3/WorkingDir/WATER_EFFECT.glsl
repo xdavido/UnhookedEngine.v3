@@ -7,6 +7,10 @@ layout(location=1) in vec3 normal;
 uniform mat4 projectionMatrix;
 uniform mat4 worldViewMatrix;
 
+uniform samplerCube skybox;
+uniform mat4 inverseProjection;
+uniform mat4 inverseView;
+
 out Data
 {
     vec3 positionViewspace;

@@ -407,6 +407,74 @@ GLuint CreateCubeVAO()
     return cubeVAO;
 }
 
+void CreateCubeVAO(GLuint& vao, GLuint& vbo, GLuint& ibo, u32& indexCount)
+{
+    float vertices[] = {
+        // pos               // normals
+        -1, -1, -1,   0,  0, -1,
+         1, -1, -1,   0,  0, -1,
+         1,  1, -1,   0,  0, -1,
+        -1,  1, -1,   0,  0, -1,
+
+        -1, -1,  1,   0,  0, 1,
+         1, -1,  1,   0,  0, 1,
+         1,  1,  1,   0,  0, 1,
+        -1,  1,  1,   0,  0, 1,
+
+        -1, -1, -1,  -1,  0, 0,
+        -1,  1, -1,  -1,  0, 0,
+        -1,  1,  1,  -1,  0, 0,
+        -1, -1,  1,  -1,  0, 0,
+
+         1, -1, -1,   1,  0, 0,
+         1,  1, -1,   1,  0, 0,
+         1,  1,  1,   1,  0, 0,
+         1, -1,  1,   1,  0, 0,
+
+        -1, -1, -1,   0, -1, 0,
+        -1, -1,  1,   0, -1, 0,
+         1, -1,  1,   0, -1, 0,
+         1, -1, -1,   0, -1, 0,
+
+        -1,  1, -1,   0, 1, 0,
+        -1,  1,  1,   0, 1, 0,
+         1,  1,  1,   0, 1, 0,
+         1,  1, -1,   0, 1, 0,
+    };
+
+    u32 indices[] = {
+         0,  1,  2,  2,  3,  0,
+         4,  5,  6,  6,  7,  4,
+         8,  9, 10, 10, 11,  8,
+        12, 13, 14, 14, 15, 12,
+        16, 17, 18, 18, 19, 16,
+        20, 21, 22, 22, 23, 20
+    };
+    indexCount = sizeof(indices) / sizeof(u32);
+
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ibo);
+
+    glBindVertexArray(vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    // Position (location = 0)
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)0);
+
+    // Normal (location = 1)
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)(sizeof(float) * 3));
+
+    glBindVertexArray(0);
+}
+
 void Init(App* app)
 {
     glEnable(GL_DEPTH_TEST);
@@ -476,6 +544,10 @@ void Init(App* app)
 
 
     app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT_DEFERRED");
+    app->refractionProgramIdx = LoadProgram(app, "ENV_REFRACTION.glsl", "ENV_REFRACTION");
+    app->reflectionProgramIdx = LoadProgram(app, "ENV_REFLECTION.glsl", "ENV_REFLECTION");
+
+    CreateCubeVAO(app->vaoRefractionCube, app->vboRefractionCube, app->iboRefractionCube, app->refractionCubeIndexCount);
     
     //Camera
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
@@ -637,6 +709,8 @@ void Gui(App* app)
         app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_GEOMETRY_DEFERRED" : "RENDER_GEOMETRY_FORWARD");
         app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", app->mode == Mode_Deferred_Geometry ? "WATER_EFFECT_DEFERRED" : "WATER_EFFECT_FORWARD");
         app->SkyBoxIdx = LoadProgram(app, "SKYBOX.glsl", "SKYBOX");
+        app->refractionProgramIdx = LoadProgram(app, "ENV_REFRACTION.glsl", "ENV_REFRACTION");
+        app->reflectionProgramIdx = LoadProgram(app, "ENV_REFLECTION.glsl", "ENV_REFLECTION");
 
         app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
         app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
@@ -1074,6 +1148,55 @@ void RenderSkybox(App* app)
 
 }
 
+void RenderGlassCube(App* app, const glm::mat4& modelMatrix)
+{
+    Program& refractionProgram = app->programs[app->refractionProgramIdx];
+    glUseProgram(refractionProgram.handle);
+
+    // Matrices
+    glUniformMatrix4fv(glGetUniformLocation(refractionProgram.handle, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
+    glUniformMatrix4fv(glGetUniformLocation(refractionProgram.handle, "uView"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ViewMatrix));
+    glUniformMatrix4fv(glGetUniformLocation(refractionProgram.handle, "uProjection"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ProjectionMatrix));
+
+    // Cámara
+    glUniform3fv(glGetUniformLocation(refractionProgram.handle, "uCameraPosition"), 1, glm::value_ptr(app->worldCamera.Position));
+
+    // Skybox
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
+    glUniform1i(glGetUniformLocation(refractionProgram.handle, "skybox"), 0);
+
+    // Opcional: índice de refracción
+    glUniform1f(glGetUniformLocation(refractionProgram.handle, "refractRatio"), 1.0f / 1.52f);
+
+    // Dibujar cubo (suponiendo que lo tienes cargado)
+    glBindVertexArray(app->vaoRefractionCube);
+    glDrawElements(GL_TRIANGLES, app->refractionCubeIndexCount, GL_UNSIGNED_INT, 0);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+void RenderReflectiveCube(App* app, const glm::mat4& modelMatrix)
+{
+    Program& reflectionProgram = app->programs[app->reflectionProgramIdx];
+    glUseProgram(reflectionProgram.handle);
+
+    glUniformMatrix4fv(glGetUniformLocation(reflectionProgram.handle, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
+    glUniformMatrix4fv(glGetUniformLocation(reflectionProgram.handle, "uView"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ViewMatrix));
+    glUniformMatrix4fv(glGetUniformLocation(reflectionProgram.handle, "uProjection"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ProjectionMatrix));
+    glUniform3fv(glGetUniformLocation(reflectionProgram.handle, "uCameraPosition"), 1, glm::value_ptr(app->worldCamera.Position));
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
+    glUniform1i(glGetUniformLocation(reflectionProgram.handle, "skybox"), 0);
+
+    glBindVertexArray(app->vaoRefractionCube);
+    glDrawElements(GL_TRIANGLES, app->refractionCubeIndexCount, GL_UNSIGNED_INT, 0);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
 
 void Render(App* app)
 {
@@ -1161,12 +1284,18 @@ void Render(App* app)
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
 
-            
+            glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0, 10, 0));
+            RenderGlassCube(app, modelMatrix);
+
+            modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(10.0f, 10.f, 0.0f));
+            RenderReflectiveCube(app, modelMatrix);
+
             // 4. Renderizar el agua
             RenderWater(app);
 
             RenderSkybox(app);
-           
+
+
 
         }
         break;
@@ -1203,9 +1332,16 @@ void Render(App* app)
            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
             RenderWater(app);
 
+            glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0, 10, 0));
+            RenderGlassCube(app, modelMatrix);
+
+            modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(10.0f, 10.f, 0.0f));
+            RenderReflectiveCube(app, modelMatrix);
+
             // 4. Final: compositar quad con G-Buffers
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
            RenderScreenFillQuad(app, app->primaryFBO);
+
         }
         break;
 
