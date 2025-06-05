@@ -82,6 +82,11 @@ uniform float far = 100.0;
 uniform int uDisplayMode;
 uniform bool uInvertDepth;
 
+uniform samplerCube skybox;
+uniform mat4 inverseProjection;
+uniform mat4 inverseView;
+uniform vec2 viewportSize;
+
 layout(location=0) out vec4 oColor;
 
 
@@ -131,9 +136,18 @@ void main()
 {
 
     float depth = texture(uDepth, vTexCoord).r;
-    if (depth >= 1.0 - 1e-5) // Evita precision issues
+    if (depth >= 1.0 - 1e-5) // // Si no hay geometria rellenar con skybox
     {
-        oColor = vec4(0.0, 0.0, 0.0, 1.0); // Fondo negro
+        vec2 screenUV = gl_FragCoord.xy / viewportSize;
+        vec2 ndc = screenUV * 2.0 - 1.0;
+        vec4 clip = vec4(ndc, 1.0, 1.0);
+
+        vec4 viewRay = inverseProjection * clip;
+        viewRay = vec4(viewRay.xy, -1.0, 0.0);
+        vec3 worldDir = normalize((inverseView * viewRay).xyz);
+
+        vec3 skyColor = texture(skybox, worldDir).rgb;
+        oColor = vec4(skyColor, 1.0);
         return;
     }
 

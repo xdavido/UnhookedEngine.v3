@@ -118,7 +118,10 @@
     <None Include="WorkingDir\WATER_EFFECT.glsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="EQUIRECT_TO_CUBEMAP.glsl">
+    <None Include="WorkingDir\EQUIRECT_TO_CUBEMAP.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="WorkingDir\SKYBOX.glsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

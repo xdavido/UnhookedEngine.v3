@@ -234,56 +234,61 @@ void RenderScreenFillQuad(App* app, const FrameBuffer& aFBO)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClearColor(0.0, 0.0, 0.0, 0.0);
-
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     glViewport(0, 0, app->displaySize.x, app->displaySize.y);
 
- 
+    Program& programTexturedGeometry = app->programs[app->texturedGeometryProgramIdx];
+    glUseProgram(programTexturedGeometry.handle);
+    glBindVertexArray(app->vao);
 
-        Program& programTexturedGeometry = app->programs[app->texturedGeometryProgramIdx];
-        glUseProgram(programTexturedGeometry.handle);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        glBindVertexArray(app->vao);
+    glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
 
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
+    glUniform1i(glGetUniformLocation(programTexturedGeometry.handle, "uDisplayMode"), static_cast<int>(app->deferredDisplayMode));
+    glUniform1i(glGetUniformLocation(programTexturedGeometry.handle, "uInvertDepth"), static_cast<int>(app->InverseDepth));
 
-
-        GLint displayModeLoc = glGetUniformLocation(programTexturedGeometry.handle, "uDisplayMode");
-        glUniform1i(displayModeLoc, static_cast<int>(app->deferredDisplayMode));
-
-        GLint invertDepthLoc = glGetUniformLocation(programTexturedGeometry.handle, "uInvertDepth");
-        glUniform1i(invertDepthLoc, static_cast<int>(app->InverseDepth));
-
-
-         size_t iteration = 0;
-
-
-        const char* uniformNames[] = { "uAlbedo", "uNormals", "uPosition", "uViewDir" };
-        for (const auto& texture : aFBO.attachments)
-        {
-            GLint uniformPosition = glGetUniformLocation(programTexturedGeometry.handle, uniformNames[iteration]);
-
-
-            glActiveTexture(GL_TEXTURE0 + iteration);
-            glBindTexture(GL_TEXTURE_2D, texture.second);
-            glUniform1i(uniformPosition, iteration);
-            ++iteration;
-        }
-    
-        GLint uniformPosition = glGetUniformLocation(programTexturedGeometry.handle, "uDepth");
+    size_t iteration = 0;
+    const char* uniformNames[] = { "uAlbedo", "uNormals", "uPosition", "uViewDir" };
+    for (const auto& texture : aFBO.attachments)
+    {
+        GLint uniformLocation = glGetUniformLocation(programTexturedGeometry.handle, uniformNames[iteration]);
         glActiveTexture(GL_TEXTURE0 + iteration);
-        glBindTexture(GL_TEXTURE_2D, aFBO.depthHandle);
-        glUniform1i(uniformPosition, iteration);
-    
-  
+        glBindTexture(GL_TEXTURE_2D, texture.second);
+        glUniform1i(uniformLocation, iteration);
+        ++iteration;
+    }
+
+    // Depth texture
+    GLint depthLoc = glGetUniformLocation(programTexturedGeometry.handle, "uDepth");
+    glActiveTexture(GL_TEXTURE0 + iteration);
+    glBindTexture(GL_TEXTURE_2D, aFBO.depthHandle);
+    glUniform1i(depthLoc, iteration);
+    ++iteration;
+
+    // ✅ Skybox cubemap
+    glActiveTexture(GL_TEXTURE0 + iteration);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
+    glUniform1i(glGetUniformLocation(programTexturedGeometry.handle, "skybox"), iteration);
+    ++iteration;
+
+    // ✅ Viewport size
+    glUniform2f(glGetUniformLocation(programTexturedGeometry.handle, "viewportSize"), (float)app->displaySize.x, (float)app->displaySize.y);
+
+    // ✅ Matrices inversas
+    glm::mat4 invProj = glm::inverse(app->worldCamera.ProjectionMatrix);
+    glm::mat4 invView = glm::inverse(app->worldCamera.ViewMatrix);
+
+    glUniformMatrix4fv(glGetUniformLocation(programTexturedGeometry.handle, "inverseProjection"), 1, GL_FALSE, glm::value_ptr(invProj));
+    glUniformMatrix4fv(glGetUniformLocation(programTexturedGeometry.handle, "inverseView"), 1, GL_FALSE, glm::value_ptr(invView));
+
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
-  
+
     glBindVertexArray(0);
     glUseProgram(0);
 }
+
 
 u32 ConvertHDRIToCubemap(App* app, const char* filepath)
 {
@@ -445,6 +450,12 @@ void Init(App* app)
 
     app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
 
+    // ✅ Verificar contenido del cubemap
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
+    GLint w;
+    glGetTexLevelParameteriv(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, GL_TEXTURE_WIDTH, &w);
+    std::cout << "[DEBUG] Cubemap face width: " << w << std::endl;
+
     //Scene 1
     app->BaseIdx = LoadModel(app, "Rocks/Base.obj");
     app->SculptIdx = LoadModel(app, "Rocks/Sculpt.obj");
@@ -458,7 +469,7 @@ void Init(App* app)
     app->WoodIdx =LoadModel(app, "Island/Wood.obj");
     app->WindowsIdx  =LoadModel(app, "Island/Windows.obj");
     app->StoneIdx  =LoadModel(app, "Island/Stone.obj");
-
+    app->SkyBoxIdx = LoadProgram(app, "SKYBOX.glsl", "SKYBOX");
 
     app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY_DEFERRED");
     app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
@@ -625,7 +636,7 @@ void Gui(App* app)
         app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_QUAD_DEFERRED" : "RENDER_QUAD_FORWARD");
         app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_GEOMETRY_DEFERRED" : "RENDER_GEOMETRY_FORWARD");
         app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", app->mode == Mode_Deferred_Geometry ? "WATER_EFFECT_DEFERRED" : "WATER_EFFECT_FORWARD");
-
+        app->SkyBoxIdx = LoadProgram(app, "SKYBOX.glsl", "SKYBOX");
 
         app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
         app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
@@ -1034,6 +1045,35 @@ void RenderWater(App* app)
     glUseProgram(0);
 }
 
+void RenderSkybox(App* app)
+{
+    glDepthFunc(GL_LEQUAL); // Para dibujar detrás de todo
+
+
+    Program& program = app->programs[app->SkyBoxIdx];
+    glUseProgram(program.handle);
+
+    glm::mat4 view = glm::mat4(glm::mat3(app->worldCamera.ViewMatrix));
+    glm::mat4 projection = app->worldCamera.ProjectionMatrix;
+
+    glUniformMatrix4fv(glGetUniformLocation(program.handle, "view"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(program.handle, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
+    glUniform1i(glGetUniformLocation(program.handle, "skybox"), 0);
+
+    GLuint vao = CreateCubeVAO(); // Ya lo tienes
+
+    glBindVertexArray(vao);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
+
+    glDepthFunc(GL_LESS); // Restaurar comportamiento normal
+    glUseProgram(0);
+
+}
+
 
 void Render(App* app)
 {
@@ -1121,53 +1161,51 @@ void Render(App* app)
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
 
+            
             // 4. Renderizar el agua
             RenderWater(app);
 
+            RenderSkybox(app);
+           
 
         }
         break;
 
         case Mode_Deferred_Geometry:
         {
-
-            RenderSceneWithClipPlane(app, glm::vec4(0, 1, 0, 0)); // Plano de recorte para reflexión
+            // 1. Reflexión
+            RenderSceneWithClipPlane(app, glm::vec4(0, 1, 0, 0));
             RenderScreenFillQuad(app, app->reflectionFBO);
 
-            // 2. Renderizar refracción
+            // 2. Refracción
             glBindFramebuffer(GL_FRAMEBUFFER, app->refractionFBO.handle);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // Usar cámara normal para refracción
             glm::mat4 refractionVP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
             UpdateEntitiesWithVP(app, refractionVP);
-           
-            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0)); // Plano de recorte para refracción
-
+            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0));
             RenderScreenFillQuad(app, app->refractionFBO);
 
-            // 3. Renderizar escena principal
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            // 3. Escena principal
             glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            //// Configurar múltiples render targets si es necesario
             std::vector<GLuint> textures;
-            for (auto& it : app->primaryFBO.attachments) {
+            for (auto& it : app->primaryFBO.attachments)
                 textures.push_back(it.second);
-            }
             glDrawBuffers(textures.size(), textures.data());
-            // Renderizar escena normal sin plano de recorte (o con uno muy lejano)
-            UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix* app->worldCamera.ViewMatrix);
-            RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
 
-            // Renderizar el agua
+            
+            RenderSkybox(app);
+
+            // Renderizar escena
+            UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix);
+           RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
             RenderWater(app);
 
-            // FUNCION Renderizar el quad final juntando todos los FBO PERO SIN GENERAR LUCES
-            RenderScreenFillQuad(app, app->primaryFBO);
-                   
-
+            // 4. Final: compositar quad con G-Buffers
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+           RenderScreenFillQuad(app, app->primaryFBO);
         }
         break;
 

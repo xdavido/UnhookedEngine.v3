@@ -315,7 +315,7 @@ struct App
     u32 WoodIdx;
     u32 WindowsIdx;
     u32 StoneIdx;
-
+    u32 SkyBoxIdx;
 
     u32 waterModelIdx;
 
