@@ -342,6 +342,7 @@ struct App
 
     // VAO object to link our screen filling quad with our textured quad shader
     GLuint vao;
+    GLuint SkyBoxVao;
 
     Camera worldCamera;
     GLint maxUniformBufferSize;

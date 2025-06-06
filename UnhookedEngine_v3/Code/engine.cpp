@@ -578,6 +578,8 @@ void Init(App* app)
 
     MapBuffer(app->entityUBO, GL_WRITE_ONLY);
 
+    app->SkyBoxVao = CreateCubeVAO();
+
     // Entidades para Rocks
     CreateEntity(app, app->BaseIdx, VP, vec3(0));
     CreateEntity(app, app->SculptIdx, VP, vec3(0));
@@ -1185,8 +1187,8 @@ void RenderSkybox(App* app, const glm::mat4& viewMatrix, const glm::mat4& projec
     glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
     glUniform1i(glGetUniformLocation(program.handle, "skybox"), 0);
 
-    GLuint vao = CreateCubeVAO();
-    glBindVertexArray(vao);
+    
+    glBindVertexArray(app->SkyBoxVao);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
 
