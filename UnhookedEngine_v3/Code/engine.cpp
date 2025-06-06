@@ -854,6 +854,13 @@ void Gui(App* app)
         ImGui::SliderFloat("Wave Tile Size", &app->waterTileSize, 0.1f, 20.0f);
     }
 
+    if (ImGui::CollapsingHeader("Camera Orbit"))
+    {
+        ImGui::Checkbox("Enable Orbit", &app->orbitEnabled);
+        ImGui::SliderFloat("Orbit Radius", &app->orbitRadius, 1.0f, 50.0f);
+        ImGui::SliderFloat("Orbit Speed", &app->orbitSpeed, 0.1f, 1.0f);
+        ImGui::DragFloat3("Orbit Center", &app->orbitCenter[0], 0.1f);
+    }
 
     ImGui::End();
 
@@ -932,18 +939,51 @@ void Update(App* app)
         app->worldCamera.Up = glm::normalize(glm::cross(app->worldCamera.Right, app->worldCamera.Front));
     }
 
+
+    // Manejar activación/desactivación con espacio
+    if (app->input.keys[Key::K_SPACE] == ButtonState::BUTTON_PRESS)
+    {
+        app->orbitEnabled = !app->orbitEnabled;
+        if (app->orbitEnabled)
+        {
+            // Calcular centro de órbita (puedes ajustar esto según tu escena)
+            app->orbitCenter = glm::vec3(0.0f, 5.0f, 0.0f); // Ejemplo: centro en Y=5
+            app->orbitRadius = glm::distance(app->worldCamera.Position, app->orbitCenter);
+        }
+    }
+
+
+    // Movimiento orbital si está activado
+    if (app->orbitEnabled)
+    {
+        app->orbitAngle += app->orbitSpeed * app->deltaTime;
+
+        // Calcular nueva posición de la cámara
+        float x = app->orbitCenter.x + app->orbitRadius * cos(app->orbitAngle);
+        float z = app->orbitCenter.z + app->orbitRadius * sin(app->orbitAngle);
+        app->worldCamera.Position = glm::vec3(x, app->worldCamera.Position.y, z);
+
+        // Mirar siempre al centro
+        app->worldCamera.Front = glm::normalize(app->orbitCenter - app->worldCamera.Position);
+        app->worldCamera.Right = glm::normalize(glm::cross(app->worldCamera.Front, glm::vec3(0.0f, 1.0f, 0.0f)));
+        app->worldCamera.Up = glm::normalize(glm::cross(app->worldCamera.Right, app->worldCamera.Front));
+    }
+    
+
     // Check if camera actually moved
     if (prevPosition != app->worldCamera.Position || prevFront != app->worldCamera.Front)
     {
         // Actualizar la matriz de vista
-        app->worldCamera.ViewMatrix = glm::lookAt(app->worldCamera.Position,
-            app->worldCamera.Position + app->worldCamera.Front,
-            app->worldCamera.Up);
+        app->worldCamera.ViewMatrix = glm::lookAt(app->worldCamera.Position, app->worldCamera.Position + app->worldCamera.Front, app->worldCamera.Up);
 
         // Update all entities' VP matrices
         UpdateEntities(app);
         UpdateLights(app);
     }
+
+    // Actualizar entidades y luces
+    UpdateEntities(app);
+    UpdateLights(app);
 
     app->time += app->deltaTime;
 

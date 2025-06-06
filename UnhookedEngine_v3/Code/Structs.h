@@ -369,6 +369,12 @@ struct App
 
     SceneType currentScene = Scene_Rocks; // Escena inicial
 
+    bool orbitEnabled = false;
+    float orbitRadius = 15.0f;  // Distancia desde el punto de interés
+    float orbitSpeed = 0.2f;    // Velocidad de rotación
+    float orbitAngle = 0.0f;    // Ángulo actual
+    glm::vec3 orbitCenter = glm::vec3(0.0f); // Punto alrededor del cual orbitar
+
 };
 
 
