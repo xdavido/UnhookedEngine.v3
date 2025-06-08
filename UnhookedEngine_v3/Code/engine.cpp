@@ -15,8 +15,7 @@
 
 namespace fs = std::filesystem;
 
-
-
+bool showEnvironmentSphere = false;
 glm::mat4 TransformScale(const vec3& scaleFactors)
 {
     glm::mat4 transform = scale(scaleFactors);
@@ -1231,16 +1230,9 @@ void Gui(App* app)
 
             }
 
+        ImGui::Checkbox("Show IBL Sphere", &showEnvironmentSphere);
 
-        // Reflections
-        static bool useDiffuse = true;
-        static bool useSpecular = true;
 
-        if (ImGui::Checkbox("Use Diffuse IBL", &useDiffuse) ||
-            ImGui::Checkbox("Use Specular IBL", &useSpecular))
-        {
-            app->environnmentComponent->SetReflectionMode(useDiffuse, useSpecular);
-        }
     }
     
 
@@ -1605,6 +1597,7 @@ void RenderSkybox(App* app, const glm::mat4& viewMatrix, const glm::mat4& projec
 
 void RenderSphereIBL(App* app)
 {
+    if (!showEnvironmentSphere) return;
     Program& iblProgram = app->programs[app->iblCombinedProgramIdx];
     glUseProgram(iblProgram.handle);
 
