@@ -75,6 +75,8 @@ uniform sampler2D uNormals;
 uniform sampler2D uPosition;
 uniform sampler2D uViewDir;
 uniform sampler2D uDepth;
+uniform sampler2D uOutQuad;
+
 
 uniform float near = 0.1;
 uniform float far = 100.0;
@@ -88,6 +90,10 @@ uniform mat4 inverseView;
 uniform vec2 viewportSize;
 
 layout(location=0) out vec4 oColor;
+
+// Alternativa: detectar agua por un valor especial en el alpha channel
+float waterFlag = texture(uAlbedo, vTexCoord).a;
+bool isWater = waterFlag > 0.9; // Asumiendo que marcas el agua con alpha=1.0
 
 
 vec3 CalcDirLight(Light alight, vec3 normal, vec3 position, vec3 viewDir, vec3 albedo)
@@ -134,9 +140,8 @@ vec3 CalcPointLight(Light pointLight, vec3 normal, vec3 position, vec3 viewDir, 
 
 void main()
 {
-
     float depth = texture(uDepth, vTexCoord).r;
-    if (depth >= 1.0 - 1e-5) // // Si no hay geometria rellenar con skybox
+    if (depth >= 1.0 - 1e-5) // Si no hay geometria rellenar con skybox
     {
         vec2 screenUV = gl_FragCoord.xy / viewportSize;
         vec2 ndc = screenUV * 2.0 - 1.0;
@@ -156,21 +161,29 @@ void main()
     vec3 Position = texture(uPosition, vTexCoord).xyz;
     vec3 ViewDir = normalize(texture(uViewDir, vTexCoord).xyz);
     
-   
+    // Detectar si es agua (por posición Y o algún otro criterio)
+    bool isWater = Position.y < -0.03 && Position.y > -0.05;
+
     switch (uDisplayMode)
     {
         case 0:  // Default: Iluminación con luces
-        
-           vec3 returnColor = vec3(0.0);
-    for (int i = 0; i < uLightCount; ++i)
-    {
-        if (uLight[i].type == 0) // Directional light
-            returnColor += CalcDirLight(uLight[i], Normal,Position, ViewDir, Albedo);
-        else if (uLight[i].type == 1) // Point light
-            returnColor += CalcPointLight(uLight[i], Normal, Position, ViewDir, Albedo);
-    }
-
-    oColor = vec4(returnColor, 1.0);
+            if (isWater)
+            {
+                // Si es agua, simplemente usar el albedo sin iluminación
+                oColor = vec4(Albedo, 1.0);
+            }
+            else
+            {
+                vec3 returnColor = vec3(0.0);
+                for (int i = 0; i < uLightCount; ++i)
+                {
+                    if (uLight[i].type == 0) // Directional light
+                        returnColor += CalcDirLight(uLight[i], Normal, Position, ViewDir, Albedo);
+                    else if (uLight[i].type == 1) // Point light
+                        returnColor += CalcPointLight(uLight[i], Normal, Position, ViewDir, Albedo);
+                }
+                oColor = vec4(returnColor, 1.0);
+            }
             break;
 
         case 1:  // Albedo

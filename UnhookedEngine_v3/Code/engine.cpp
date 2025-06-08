@@ -756,15 +756,9 @@ void Init(App* app)
 
     hdriFiles = GetHDRIFiles("Skybox/");
 
-   // app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
     app->environnmentComponent = new Environment();
-
-    app->environnmentComponent->LoadHDRI(app, "Skybox/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
+    app->environnmentComponent->LoadHDRI(app, "Skybox//kloppenheim_02_puresky_4k.hdr");
    
-
-    
-
-    
 
     // Verificar contenido del cubemap
     glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
@@ -828,8 +822,6 @@ void Init(App* app)
     app->globalUBO = CreateConstantBuffer(app->maxUniformBufferSize);
     app->entityUBO = CreateConstantBuffer(app->maxUniformBufferSize);
 
-    app->currentScene = Scene_Island;
-
 
     // Luces para Rocks
     app->lights.push_back({ LightType::Light_Directional, vec3(0.2,0.5,0.9), vec3(-1,-1,1), vec3(0) });
@@ -852,11 +844,11 @@ void Init(App* app)
     UnmapBuffer(app->entityUBO);
     UpdateLights(app);
 
-    app->mode = Mode_Forward_Geometry;
+    app->mode = Mode_Deferred_Geometry;
     app->primaryFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y);
 
-    app->reflectionFBO.CreateFBO(1, app->displaySize.x, app->displaySize.y);
-    app->refractionFBO.CreateFBO(1, app->displaySize.x, app->displaySize.y);
+    app->reflectionFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y);
+    app->refractionFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y);
 
     
     
@@ -916,7 +908,7 @@ void Gui(App* app)
             if (app->skyboxMap != 0) {
                 glDeleteTextures(1, &app->skyboxMap);
             }
-            app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
+            app->environnmentComponent->LoadHDRI(app, "Skybox//kloofendal_48d_partly_cloudy_puresky_4k.hdr");
             CreateIrradianceMap(app);
             CreatePrefilteredMap(app);
 
@@ -943,7 +935,7 @@ void Gui(App* app)
             if (app->skyboxMap != 0) {
                 glDeleteTextures(1, &app->skyboxMap);
             }
-            app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloppenheim_02_puresky_4k.hdr");
+            app->environnmentComponent->LoadHDRI(app, "Skybox/kloppenheim_02_puresky_4k.hdr");
             CreateIrradianceMap(app);
             CreatePrefilteredMap(app);
 
