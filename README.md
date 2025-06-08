@@ -62,6 +62,8 @@ Se ha implementado un shader de agua avanzado (WATER_EFFECT.glsl) aplicable a cu
 ### 🌐 Environment Mapping  
 #### Autor: Xiao Shan Costajussa  
 
+![image](https://github.com/user-attachments/assets/a3773619-9ad3-469b-916d-074e96e2b368)
+
 Se ha implementado un sistema completo de **Image-Based Lighting (IBL)** para renderizar entornos con iluminación realista basada en HDRI. Incluye una arquitectura modular para cargar y procesar mapas HDR, con las siguientes capacidades:
 
 - **Conversión de HDRI a Cubemap:**  Conversión de mapas equirectangulares `.hdr` a cubemaps usando un shader personalizado (`EQUIRECT_TO_CUBEMAP.glsl`), con opción de **tone mapping** integrada para gestionar exposición y corrección gamma.
@@ -92,6 +94,7 @@ Se ha diseñado un componente `Environment` con los siguientes métodos clave:
 - `BindMaps()`: Enlaza los mapas generados a cualquier shader activo.
 
 Este sistema permite tener iluminación ambiental dinámica, adaptándose a diferentes entornos y estilos gráficos de forma interactiva.
+
 
 
 ### Assets de terceros
