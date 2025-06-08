@@ -16,10 +16,15 @@ Este motor implementa un **motor de renderizado diferido** basado en los concept
 - **E, Q**: Movimiento vertical de la cámara (arriba/abajo).
 - **SHIFT**: Aumento de velocidad en el movimiento de la cámara.
 - **RATÓN (Right Click)**: Rotación de la cámara alrededor de la escena.
+- **SPACE**: Movimiento orbital de la cámara.
 
-### 🏙️ Escena 3D
-- La escena está compuesta por modelos 3D estáticos, creados y configurados en la función **Init()**.
-- No se incluye carga dinámica de modelos, ya que los objetos son definidos y cargados al inicio del programa.
+### 🏙️ Escenas 3D
+El motor permite seleccionar entre dos escenas distintas, cada una con geometrías y estilos visuales diferentes:
+
+- **Escena 1:** Una roca altar handpainted, con detalles estilizados y texturas pintadas a mano.
+- **Escena 2:** Una isla low-poly con un faro, que utiliza geometría simplificada y colores planos para un estilo artístico minimalista.
+
+Las escenas están definidas y cargadas al inicio del programa en la función **Init()**, sin soporte para carga dinámica en tiempo de ejecución.
 
 ### 🎨 Visualización G-Buffer y Framebuffer
 - Puedes seleccionar entre visualizar el **G-Buffer** o el **Framebuffer** para inspeccionar el contenido del renderizado.
@@ -37,4 +42,28 @@ El motor permite probar distintos tipos de luces, tanto estáticas como dinámic
 
 Ambos tipos de luz se configuran inicialmente en la función **Init()**, pero pueden ser editados y modificados en tiempo real utilizando **ImGui** 🛠️.
 
+### 🌊 Water Effect
+Se ha implementado un shader de agua avanzado (WATER_EFFECT.glsl) aplicable a cualquier entidad del motor. Actualmente está demostrado sobre un plano en la posición (0, 0). Este efecto incluye:
+
+- **Reflexión:** Reflejo del entorno en tiempo real.
+
+- **Refracción:** Distorsión del entorno bajo el agua.
+
+- **Distorsión** dinámica mediante DuDv Map animado.
+
+- **Especularidad** de luces usando un Normal Map para simular la incidencia de luz en la superficie.
+
+- **Foam (espuma)** generada en función de la profundidad y cercanía a superficies.
+
+- **Causticas** simuladas mediante una textura proyectada en base a la profundidad (Depth).
+
+### 🌐 Enviornment Mapping
+#### Autor: Xiao Shan Costajussa
+
+
+### Assets de terceros
+
+ [**Scene1 FBX - will.nsq**](https://sketchfab.com/will.nsq)
+ 
+ [**Scene2 FBX - ferofluid**](https://sketchfab.com/ferofluid)
 
