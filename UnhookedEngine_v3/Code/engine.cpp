@@ -15,7 +15,7 @@
 
 namespace fs = std::filesystem;
 
-bool showEnvironmentSphere = false;
+bool showEnvironmentSphere = false; 
 glm::mat4 TransformScale(const vec3& scaleFactors)
 {
     glm::mat4 transform = scale(scaleFactors);
@@ -798,22 +798,17 @@ void Init(App* app)
 
     app->SkyBoxIdx = LoadProgram(app, "SKYBOX.glsl", "SKYBOX");
     app->irradianceConvolutionProgramIdx = LoadProgram(app, "IBL_CONVOLUTION.glsl", "IBL_CONVOLUTION");
-    app->irradianceDebugProgramIdx = LoadProgram(app, "IRRADIANCE_DEBUG.glsl", "IRRADIANCE_DEBUG");
-    app->prefilterConvolutionProgramIdx = LoadProgram(app, "PREFILTER_CONVOLUTION.glsl", "PREFILTER_CONVOLUTION");
-
     app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY_DEFERRED");
     app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
 
-
     app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT_DEFERRED");
-    app->refractionProgramIdx = LoadProgram(app, "ENV_REFRACTION.glsl", "ENV_REFRACTION");
-    app->reflectionProgramIdx = LoadProgram(app, "ENV_REFLECTION.glsl", "ENV_REFLECTION");
+
     app->iblCombinedProgramIdx = LoadProgram(app, "IBL_COMBINED.glsl", "IBL_COMBINED");
 
     CreateCubeVAO(app->vaoRefractionCube, app->vboRefractionCube, app->iboRefractionCube, app->refractionCubeIndexCount);
     CreateSphereVAO(app->vaoSphere, app->vboSphere, app->iboSphere, app->indexCountSphere);
     CreateIrradianceMap(app);
-    CreatePrefilteredMap(app);
+   
 
    
 
@@ -999,9 +994,7 @@ void Gui(App* app)
         app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT_DEFERRED");
        
         app->SkyBoxIdx = LoadProgram(app, "SKYBOX.glsl", "SKYBOX");
-        app->irradianceDebugProgramIdx = LoadProgram(app, "IRRADIANCE_DEBUG.glsl", "IRRADIANCE_DEBUG");
         app->irradianceConvolutionProgramIdx = LoadProgram(app, "IBL_CONVOLUTION.glsl", "IBL_CONVOLUTION");
-        app->prefilterConvolutionProgramIdx = LoadProgram(app, "PREFILTER_CONVOLUTION.glsl", "PREFILTER_CONVOLUTION");
         app->equirectToCubemapProgramIdx = LoadProgram(app, "EQUIRECT_TO_CUBEMAP.glsl", "USE_TONEMAP");
 
 
@@ -1211,10 +1204,6 @@ void Gui(App* app)
                 app->iblCombinedProgramIdx = LoadProgram(app, "IBL_COMBINED.glsl", "IBL_COMBINED");
                 app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT_DEFERRED");
 
-                
-                app->irradianceDebugProgramIdx = LoadProgram(app, "IRRADIANCE_DEBUG.glsl", "IRRADIANCE_DEBUG");
-                
-                app->prefilterConvolutionProgramIdx = LoadProgram(app, "PREFILTER_CONVOLUTION.glsl", "PREFILTER_CONVOLUTION");
                 
 
 
