@@ -57,8 +57,44 @@ Se ha implementado un shader de agua avanzado (WATER_EFFECT.glsl) aplicable a cu
 
 - **Causticas** simuladas mediante una textura proyectada en base a la profundidad (Depth).
 
-### 🌐 Enviornment Mapping
-#### Autor: Xiao Shan Costajussa
+### 🌐 Environment Mapping  
+#### Autor: Xiao Shan Costajussa  
+
+Se ha implementado un sistema completo de **Image-Based Lighting (IBL)** para renderizar entornos con iluminación realista basada en HDRI. Incluye una arquitectura modular para cargar y procesar mapas HDR, con las siguientes capacidades:
+
+#### ✅ Características:
+- **Conversión de HDRI a Cubemap:**  
+  Conversión de mapas equirectangulares `.hdr` a cubemaps usando un shader personalizado (`EQUIRECT_TO_CUBEMAP.glsl`), con opción de **tone mapping** integrada para gestionar exposición y corrección gamma.
+  
+- **Irradiance Map (Diffuse IBL):**  
+  Convolución del cubemap para generar una versión suavizada que captura la iluminación difusa del entorno. Ideal para materiales mate.
+
+- **Prefiltered Environment Map (Specular IBL):**  
+  Convolución por importancia con múltiples niveles de mipmapping para simular reflejos especulares a diferentes niveles de rugosidad. El shader `PREFILTER_ENV_MAP.glsl` genera este mapa.
+
+- **Shader combinado para IBL:**  
+  Shader (`IBL_COMBINED.glsl`) que permite combinar el **diffuse** y **specular** IBL.
+- **Tone Mapping:**  
+  Se implementa **tone mapping exponencial**, controlable desde el inspector:
+  - Activar/desactivar `USE_TONEMAP` en tiempo real.
+  - Ajuste de exposición (`exposure`) para comprimir el rango dinámico y adaptar la iluminación HDR al rango LDR de pantalla.
+  - Se aplica durante la conversión de HDRI, y puede alternarse para evaluar diferencias visuales.
+
+- **Control en tiempo real con ImGui:**
+  - Cambiar entre HDRIs disponibles.
+  - Activar/desactivar **tone mapping** y modificar su exposición.
+  - Mostrar u ocultar la esfera de prueba.
+
+#### 🛠️ Componente Environment
+Se ha diseñado un componente `Environment` con los siguientes métodos clave:
+
+- `LoadHDRI()`: Carga y convierte un HDRI a cubemap.
+- `GenerateIrradiance()`: Convoluciona y genera el mapa de irradiancia.
+- `GeneratePrefiltered()`: Genera el mipmapped cubemap especular.
+- `SetToneMapping()`: Activa o desactiva tone mapping.
+- `BindMaps()`: Enlaza los mapas generados a cualquier shader activo.
+
+Este sistema permite tener iluminación ambiental dinámica, adaptándose a diferentes entornos y estilos gráficos de forma interactiva.
 
 
 ### Assets de terceros
