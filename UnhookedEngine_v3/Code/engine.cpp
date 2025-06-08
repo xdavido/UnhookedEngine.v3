@@ -11,6 +11,11 @@
 #include <imgui.h>
 #include <stb_image.h>
 #include <stb_image_write.h>
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
+
 
 glm::mat4 TransformScale(const vec3& scaleFactors)
 {
@@ -322,9 +327,12 @@ u32 ConvertHDRIToCubemap(App* app, const char* filepath)
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     // 3. Cargar shader de conversión
-    u32 progIdx = LoadProgram(app, "EQUIRECT_TO_CUBEMAP.glsl", "EQUIRECT_TO_CUBEMAP");
-    Program& program = app->programs[progIdx];
+   
+    Program& program = app->programs[app->equirectToCubemapProgramIdx];
     glUseProgram(program.handle);
+
+    GLint exposureLoc = glGetUniformLocation(program.handle, "exposure");
+    glUniform1f(exposureLoc, app->environnmentComponent->toneExposure);
 
     glUniform1i(glGetUniformLocation(program.handle, "equirectangularMap"), 0);
 
@@ -354,7 +362,7 @@ u32 ConvertHDRIToCubemap(App* app, const char* filepath)
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, hdrTexture);
 
-    GLuint cubeVAO = CreateCubeVAO(); // Necesitas una función que cree un cubo simple
+    GLuint cubeVAO = CreateCubeVAO(app); // Necesitas una función que cree un cubo simple
 
     for (unsigned int i = 0; i < 6; ++i)
     {
@@ -380,7 +388,11 @@ u32 ConvertHDRIToCubemap(App* app, const char* filepath)
 
 void CreateIrradianceMap(App* app)
 {
-    const u32 IRRADIANCE_RES = 32;
+    const u32 IRRADIANCE_RES = 64;
+
+    if (app->irradianceMap != 0) {
+        glDeleteTextures(1, &app->irradianceMap);
+    }
 
     // Crear textura cubemap para irradiancia
     glGenTextures(1, &app->irradianceMap);
@@ -433,7 +445,7 @@ void CreateIrradianceMap(App* app)
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, app->irradianceMap, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        RenderCube(); // Tu VAO de cubo unitario
+        RenderCube(app); // Tu VAO de cubo unitario
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -445,6 +457,10 @@ void CreatePrefilteredMap(App* app)
 {
     const u32 PREFILTERED_RES = 128;
     const u32 MAX_MIP_LEVELS = 5;
+
+    if (app->prefilteredMap != 0) {
+        glDeleteTextures(1, &app->prefilteredMap);
+    }
 
     glGenTextures(1, &app->prefilteredMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, app->prefilteredMap);
@@ -509,7 +525,7 @@ void CreatePrefilteredMap(App* app)
             glUniformMatrix4fv(glGetUniformLocation(prefilterShader.handle, "view"), 1, GL_FALSE, glm::value_ptr(views[i]));
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, app->prefilteredMap, mip);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            RenderCube();
+            RenderCube(app);
         }
     }
 
@@ -518,8 +534,17 @@ void CreatePrefilteredMap(App* app)
     glDeleteRenderbuffers(1, &rbo);
 }
 
-GLuint CreateCubeVAO()
+void DestroyCubeVAO(App* app)
 {
+    if (app->cubeVBO) glDeleteBuffers(1, &app->cubeVBO);
+    if (app->cubeVAO) glDeleteVertexArrays(1, &app->cubeVAO);
+    app->cubeVBO = 0;
+    app->cubeVAO = 0;
+}
+
+GLuint CreateCubeVAO(App* app)
+{
+    DestroyCubeVAO(app);
     float cubeVertices[] = {
         // pos
         -1, -1, -1,  1, -1, -1,  1,  1, -1,
@@ -536,18 +561,18 @@ GLuint CreateCubeVAO()
         -1, -1,  1, -1,  1, -1, -1, -1, -1
     };
 
-    GLuint cubeVAO, cubeVBO;
-    glGenVertexArrays(1, &cubeVAO);
-    glGenBuffers(1, &cubeVBO);
+   
+    glGenVertexArrays(1, &app->cubeVAO);
+    glGenBuffers(1, &app->cubeVBO);
 
-    glBindVertexArray(cubeVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+    glBindVertexArray(app->cubeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, app->cubeVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glBindVertexArray(0);
 
-    return cubeVAO;
+    return app->cubeVAO;
 }
 
 void CreateSphereVAO(GLuint& vao, GLuint& vbo, GLuint& ibo, u32& indexCount, int sectorCount = 64, int stackCount = 32)
@@ -720,6 +745,7 @@ void Init(App* app)
     //Geometry Rendering loads
     app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", "RENDER_QUAD_DEFERRED");
     app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
+    app->equirectToCubemapProgramIdx = LoadProgram(app, "EQUIRECT_TO_CUBEMAP.glsl", "EQUIRECT_TO_CUBEMAP");
 
     app->waterModelIdx = LoadModel(app, "Water/Water.obj");
 
@@ -729,7 +755,12 @@ void Init(App* app)
     app->foamMap = LoadTexture2D(app, "Water/foamMap.png");
     app->causticsMap = LoadTexture2D(app, "Water/causticsmap.jpg");
 
-    app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
+    hdriFiles = GetHDRIFiles("Skybox/");
+
+   // app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
+    app->environnmentComponent = new Environment();
+
+    app->environnmentComponent->LoadHDRI(app, "Skybox/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
    
 
     
@@ -785,7 +816,7 @@ void Init(App* app)
     CreateIrradianceMap(app);
     CreatePrefilteredMap(app);
 
-    app->skyboxMap = app->irradianceMap;
+   
 
     //Camera
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
@@ -815,7 +846,7 @@ void Init(App* app)
 
     MapBuffer(app->entityUBO, GL_WRITE_ONLY);
 
-    app->SkyBoxVao = CreateCubeVAO();
+    app->SkyBoxVao = CreateCubeVAO(app);
 
     // Entidades para Rocks
     CreateEntity(app, app->BaseIdx, VP, vec3(0));
@@ -832,6 +863,9 @@ void Init(App* app)
 
     app->reflectionFBO.CreateFBO(1, app->displaySize.x, app->displaySize.y);
     app->refractionFBO.CreateFBO(1, app->displaySize.x, app->displaySize.y);
+
+    
+    
 
 }
 
@@ -885,6 +919,9 @@ void Gui(App* app)
 
         if (app->currentScene == Scene_Rocks)
         {
+            if (app->skyboxMap != 0) {
+                glDeleteTextures(1, &app->skyboxMap);
+            }
             app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
             CreateIrradianceMap(app);
             CreatePrefilteredMap(app);
@@ -909,6 +946,9 @@ void Gui(App* app)
         }
         else
         {
+            if (app->skyboxMap != 0) {
+                glDeleteTextures(1, &app->skyboxMap);
+            }
             app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloppenheim_02_puresky_4k.hdr");
             CreateIrradianceMap(app);
             CreatePrefilteredMap(app);
@@ -957,11 +997,14 @@ void Gui(App* app)
         app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_GEOMETRY_DEFERRED" : "RENDER_GEOMETRY_FORWARD");
         app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", app->mode == Mode_Deferred_Geometry ? "WATER_EFFECT_DEFERRED" : "WATER_EFFECT_FORWARD");
         app->iblCombinedProgramIdx = LoadProgram(app, "IBL_COMBINED.glsl", "IBL_COMBINED");
+        app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT_DEFERRED");
        
         app->SkyBoxIdx = LoadProgram(app, "SKYBOX.glsl", "SKYBOX");
         app->irradianceDebugProgramIdx = LoadProgram(app, "IRRADIANCE_DEBUG.glsl", "IRRADIANCE_DEBUG");
         app->irradianceConvolutionProgramIdx = LoadProgram(app, "IBL_CONVOLUTION.glsl", "IBL_CONVOLUTION");
         app->prefilterConvolutionProgramIdx = LoadProgram(app, "PREFILTER_CONVOLUTION.glsl", "PREFILTER_CONVOLUTION");
+        app->equirectToCubemapProgramIdx = LoadProgram(app, "EQUIRECT_TO_CUBEMAP.glsl", "USE_TONEMAP");
+
 
             
         //app->refractionProgramIdx = LoadProgram(app, "ENV_REFRACTION.glsl", "ENV_REFRACTION");
@@ -1109,6 +1152,103 @@ void Gui(App* app)
         ImGui::SliderFloat("Orbit Speed", &app->orbitSpeed, 0.1f, 1.0f);
         ImGui::DragFloat3("Orbit Center", &app->orbitCenter[0], 0.1f);
     }
+
+    if (ImGui::CollapsingHeader("Environment Settings"))
+    {
+        
+
+        if (!hdriFiles.empty()) {
+            if (ImGui::BeginCombo("HDRI Selector", hdriFiles[selectedHDRI].c_str())) {
+                for (int i = 0; i < hdriFiles.size(); ++i) {
+                    bool isSelected = (i == selectedHDRI);
+                    if (ImGui::Selectable(hdriFiles[i].c_str(), isSelected)) {
+                        selectedHDRI = i;
+
+                        std::string fullPath = "Skybox/" + hdriFiles[i];
+                        if (app->environnmentComponent) {
+                            app->environnmentComponent->LoadHDRI(app, fullPath);
+                            CreateIrradianceMap(app);
+                        }
+                    }
+                    if (isSelected) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+        }
+        else {
+            ImGui::Text("No HDRI files found in assets/HDRI/");
+        } 
+
+        // Tone Mapping
+        static bool enableTone = false;
+        static bool prevEnableTone = true;
+        static float exposure = 1.0f;
+        const char* shaderMacro = enableTone ? "EQUIRECT_TO_CUBEMAP" : "USE_TONEMAP" ;
+        if (ImGui::Checkbox("Enable Tone Mapping", &enableTone))
+            if (enableTone != prevEnableTone)
+            {
+                prevEnableTone = enableTone;
+                for (auto& program : app->programs)
+                {
+                    if (program.handle != 0)
+                    {
+                        glDeleteProgram(program.handle);
+                        program.handle = 0;
+                    }
+                }
+                app->programs.clear();
+
+                app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_QUAD_DEFERRED" : "RENDER_QUAD_FORWARD");
+                app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_GEOMETRY_DEFERRED" : "RENDER_GEOMETRY_FORWARD");
+                app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", app->mode == Mode_Deferred_Geometry ? "WATER_EFFECT_DEFERRED" : "WATER_EFFECT_FORWARD");
+                app->SkyBoxIdx = LoadProgram(app, "SKYBOX.glsl", "SKYBOX");
+                app->irradianceConvolutionProgramIdx = LoadProgram(app, "IBL_CONVOLUTION.glsl", "IBL_CONVOLUTION");
+                app->equirectToCubemapProgramIdx = LoadProgram(app, "EQUIRECT_TO_CUBEMAP.glsl", shaderMacro);
+                std::string fullPath = "Skybox/" + hdriFiles[selectedHDRI];
+                app->environnmentComponent->LoadHDRI(app, fullPath);
+                app->environnmentComponent->SetToneMapping(enableTone, exposure);
+                CreateIrradianceMap(app);
+
+                app->iblCombinedProgramIdx = LoadProgram(app, "IBL_COMBINED.glsl", "IBL_COMBINED");
+                app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT_DEFERRED");
+
+                
+                app->irradianceDebugProgramIdx = LoadProgram(app, "IRRADIANCE_DEBUG.glsl", "IRRADIANCE_DEBUG");
+                
+                app->prefilterConvolutionProgramIdx = LoadProgram(app, "PREFILTER_CONVOLUTION.glsl", "PREFILTER_CONVOLUTION");
+                app->equirectToCubemapProgramIdx = LoadProgram(app, "EQUIRECT_TO_CUBEMAP.glsl", "USE_TONEMAP");
+
+
+
+                //app->refractionProgramIdx = LoadProgram(app, "ENV_REFRACTION.glsl", "ENV_REFRACTION");
+                //app->reflectionProgramIdx = LoadProgram(app, "ENV_REFLECTION.glsl", "ENV_REFLECTION");
+
+
+            
+
+                app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
+                app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
+                
+
+            }
+
+        if (enableTone)
+        {
+            if (ImGui::SliderFloat("Exposure", &exposure, 0.1f, 5.0f))
+                app->environnmentComponent->SetToneMapping(enableTone, exposure);
+        }
+
+        // Reflections
+        static bool useDiffuse = true;
+        static bool useSpecular = true;
+
+        if (ImGui::Checkbox("Use Diffuse IBL", &useDiffuse) ||
+            ImGui::Checkbox("Use Specular IBL", &useSpecular))
+        {
+            app->environnmentComponent->SetReflectionMode(useDiffuse, useSpecular);
+        }
+    }
+    
 
     ImGui::End();
 
@@ -1507,9 +1647,9 @@ void RenderSphereIBL(App* app)
 
 
 
-void RenderCube()
+void RenderCube(App* app)
 {
-    static GLuint cubeVAO = CreateCubeVAO(); // o guarda en App*
+    static GLuint cubeVAO = CreateCubeVAO(app); // o guarda en App*
     glBindVertexArray(cubeVAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
@@ -1809,4 +1949,17 @@ GLuint FindVAO(Mesh& mesh, u32 submeshIndex, const Program& program)
     return vaoHandle;
 }
 
+
+std::vector<std::string> GetHDRIFiles(const std::string& folderPath)
+{
+    std::vector<std::string> result;
+    for (const auto& entry : fs::directory_iterator(folderPath))
+    {
+        if (entry.path().extension() == ".hdr")
+        {
+            result.push_back(entry.path().filename().string());
+        }
+    }
+    return result;
+}
 

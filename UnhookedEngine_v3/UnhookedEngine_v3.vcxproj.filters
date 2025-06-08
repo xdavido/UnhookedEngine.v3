@@ -57,6 +57,9 @@
     <ClCompile Include="Code\ModelLoader.cpp">
       <Filter>UnhookedEngine_v3</Filter>
     </ClCompile>
+    <ClCompile Include="Code\EnvironmentMapping.cpp">
+      <Filter>UnhookedEngine_v3</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ThirdParty\imgui-docking\imconfig.h">
@@ -105,6 +108,9 @@
       <Filter>UnhookedEngine_v3</Filter>
     </ClInclude>
     <ClInclude Include="Code\Structs.h">
+      <Filter>UnhookedEngine_v3</Filter>
+    </ClInclude>
+    <ClInclude Include="Code\EnvironmentMapping.h">
       <Filter>UnhookedEngine_v3</Filter>
     </ClInclude>
   </ItemGroup>

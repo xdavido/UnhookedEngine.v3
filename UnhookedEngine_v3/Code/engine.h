@@ -8,6 +8,7 @@
 #include <glad/glad.h>
 
 
+
 void Init(App* app);
 
 void Gui(App* app);
@@ -38,10 +39,19 @@ void RenderWater(App* app);
 
 void RenderSkybox(App* app, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
 
-void RenderCube();
+void RenderCube(App* app);
 
 void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane);
 
 u32 ConvertHDRIToCubemap(App* app, const char* filepath);
 
-GLuint CreateCubeVAO();
+void CreateIrradianceMap(App* app);
+
+void CreateIrradianceMap(App* app);
+
+GLuint CreateCubeVAO(App* app);
+
+std::vector<std::string> GetHDRIFiles(const std::string& folderPath);
+
+static std::vector<std::string> hdriFiles;
+static int selectedHDRI = 0;

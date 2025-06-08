@@ -2,6 +2,7 @@
 #define STRUCTS
 
 #include"platform.h"
+#include "EnvironmentMapping.h"
 #include <glad/glad.h> 
 #include <stdexcept>    
 
@@ -12,6 +13,8 @@ typedef glm::vec4  vec4;
 typedef glm::ivec2 ivec2;
 typedef glm::ivec3 ivec3;
 typedef glm::ivec4 ivec4;
+
+class Environment;
 
 struct Camera {
     glm::mat4 ViewMatrix;
@@ -290,6 +293,9 @@ struct App
     std::vector<Model>  models;
     std::vector<Program>  programs;
 
+    GLuint cubeVAO = 0;
+    GLuint cubeVBO = 0;
+
 
     // program indices
     u32 texturedGeometryProgramIdx;
@@ -300,6 +306,7 @@ struct App
     u32 irradianceConvolutionProgramIdx;
     u32 prefilterConvolutionProgramIdx;
     u32 iblCombinedProgramIdx;
+    u32 equirectToCubemapProgramIdx;
 
     //Water Textures
     u32 dudvMap;
@@ -389,6 +396,9 @@ struct App
     float orbitSpeed = 0.2f;    // Velocidad de rotación
     float orbitAngle = 0.0f;    // Ángulo actual
     glm::vec3 orbitCenter = glm::vec3(0.0f); // Punto alrededor del cual orbitar
+
+
+    Environment* environnmentComponent = nullptr;
 
 };
 
