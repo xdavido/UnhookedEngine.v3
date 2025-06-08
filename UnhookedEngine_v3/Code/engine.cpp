@@ -388,7 +388,7 @@ u32 ConvertHDRIToCubemap(App* app, const char* filepath)
 
 void CreateIrradianceMap(App* app)
 {
-    const u32 IRRADIANCE_RES = 64;
+    const u32 IRRADIANCE_RES = 32;
 
     if (app->irradianceMap != 0) {
         glDeleteTextures(1, &app->irradianceMap);
@@ -1216,7 +1216,7 @@ void Gui(App* app)
                 app->irradianceDebugProgramIdx = LoadProgram(app, "IRRADIANCE_DEBUG.glsl", "IRRADIANCE_DEBUG");
                 
                 app->prefilterConvolutionProgramIdx = LoadProgram(app, "PREFILTER_CONVOLUTION.glsl", "PREFILTER_CONVOLUTION");
-                app->equirectToCubemapProgramIdx = LoadProgram(app, "EQUIRECT_TO_CUBEMAP.glsl", "USE_TONEMAP");
+                
 
 
 
@@ -1226,17 +1226,11 @@ void Gui(App* app)
 
             
 
-                app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
-                app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
+
                 
 
             }
 
-        if (enableTone)
-        {
-            if (ImGui::SliderFloat("Exposure", &exposure, 0.1f, 5.0f))
-                app->environnmentComponent->SetToneMapping(enableTone, exposure);
-        }
 
         // Reflections
         static bool useDiffuse = true;
