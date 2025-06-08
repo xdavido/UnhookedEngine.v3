@@ -295,6 +295,11 @@ struct App
     u32 texturedGeometryProgramIdx;
     u32 geometryProgramIdx;
     u32 waterProgramIdx;
+    u32 refractionProgramIdx;
+    u32 reflectionProgramIdx;
+    u32 irradianceConvolutionProgramIdx;
+    u32 prefilterConvolutionProgramIdx;
+    u32 iblCombinedProgramIdx;
 
     //Water Textures
     u32 dudvMap;
@@ -302,10 +307,13 @@ struct App
     u32 foamMap;
     u32 causticsMap;
     u32 skyboxMap;
+    u32 irradianceMap;
+    u32 prefilteredMap;
 
     //Modelo 3D cargado
     u32 BaseIdx;
     u32 SculptIdx;
+   
 
     u32 GrassIdx;
     u32 SandIdx;
@@ -316,13 +324,19 @@ struct App
     u32 WindowsIdx;
     u32 StoneIdx;
     u32 SkyBoxIdx;
-    u32 refractionProgramIdx;
-    u32 reflectionProgramIdx;
+    u32 irradianceDebugProgramIdx;
+
 
     u32 waterModelIdx;
+    u32 sphereModelIdx;
 
     u32 ModelTextureUniform;
     u32 planeIdx;
+
+    GLuint vaoSphere = 0;
+    GLuint vboSphere = 0;
+    GLuint iboSphere = 0;
+    u32 indexCountSphere = 0;
 
     GLuint vaoRefractionCube = 0;
     GLuint vboRefractionCube = 0;

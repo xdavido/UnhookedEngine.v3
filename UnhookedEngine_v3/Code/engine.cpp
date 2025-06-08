@@ -366,6 +366,9 @@ u32 ConvertHDRIToCubemap(App* app, const char* filepath)
         glDrawArrays(GL_TRIANGLES, 0, 36);
     }
 
+    //glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTex);
+    //glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glDeleteRenderbuffers(1, &rbo);
     glDeleteFramebuffers(1, &fbo);
@@ -373,6 +376,146 @@ u32 ConvertHDRIToCubemap(App* app, const char* filepath)
     glUseProgram(0);
 
     return cubemapTex;
+}
+
+void CreateIrradianceMap(App* app)
+{
+    const u32 IRRADIANCE_RES = 32;
+
+    // Crear textura cubemap para irradiancia
+    glGenTextures(1, &app->irradianceMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->irradianceMap);
+    for (u32 i = 0; i < 6; ++i)
+    {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
+            IRRADIANCE_RES, IRRADIANCE_RES, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // Setup FBO temporal para convolución
+    GLuint fbo, rbo;
+    glGenFramebuffers(1, &fbo);
+    glGenRenderbuffers(1, &rbo);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, IRRADIANCE_RES, IRRADIANCE_RES);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    // Shader de convolución
+    Program& irradianceShader = app->programs[app->irradianceConvolutionProgramIdx];
+    glUseProgram(irradianceShader.handle);
+    glUniform1i(glGetUniformLocation(irradianceShader.handle, "environmentMap"), 0);
+
+    glm::mat4 projection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    glUniformMatrix4fv(glGetUniformLocation(irradianceShader.handle, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+    static glm::mat4 views[] = {
+        glm::lookAt(glm::vec3(0, 0, 0), glm::vec3(1, 0, 0), glm::vec3(0, -1, 0)),
+        glm::lookAt(glm::vec3(0, 0, 0), glm::vec3(-1, 0, 0), glm::vec3(0, -1, 0)),
+        glm::lookAt(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), glm::vec3(0, 0, 1)),
+        glm::lookAt(glm::vec3(0, 0, 0), glm::vec3(0, -1, 0), glm::vec3(0, 0, -1)),
+        glm::lookAt(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, -1, 0)),
+        glm::lookAt(glm::vec3(0, 0, 0), glm::vec3(0, 0, -1), glm::vec3(0, -1, 0))
+    };
+
+    glViewport(0, 0, IRRADIANCE_RES, IRRADIANCE_RES);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
+
+    for (u32 i = 0; i < 6; ++i)
+    {
+        glUniformMatrix4fv(glGetUniformLocation(irradianceShader.handle, "view"), 1, GL_FALSE, glm::value_ptr(views[i]));
+
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, app->irradianceMap, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        RenderCube(); // Tu VAO de cubo unitario
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteRenderbuffers(1, &rbo);
+}
+
+void CreatePrefilteredMap(App* app)
+{
+    const u32 PREFILTERED_RES = 128;
+    const u32 MAX_MIP_LEVELS = 5;
+
+    glGenTextures(1, &app->prefilteredMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->prefilteredMap);
+
+    for (u32 mip = 0; mip < MAX_MIP_LEVELS; ++mip)
+    {
+        u32 mipWidth = PREFILTERED_RES >> mip;
+        u32 mipHeight = PREFILTERED_RES >> mip;
+        for (u32 face = 0; face < 6; ++face)
+        {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, mip, GL_RGB16F, mipWidth, mipHeight, 0, GL_RGB, GL_FLOAT, nullptr);
+        }
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    GLuint fbo, rbo;
+    glGenFramebuffers(1, &fbo);
+    glGenRenderbuffers(1, &rbo);
+
+    Program& prefilterShader = app->programs[app->prefilterConvolutionProgramIdx];
+    glUseProgram(prefilterShader.handle);
+    glUniform1i(glGetUniformLocation(prefilterShader.handle, "environmentMap"), 0);
+
+    glm::mat4 projection = glm::perspective(glm::radians(90.0f), 1.f, 0.1f, 10.0f);
+    glUniformMatrix4fv(glGetUniformLocation(prefilterShader.handle, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+    static glm::mat4 views[] = {
+        glm::lookAt(glm::vec3(0), glm::vec3(1, 0, 0), glm::vec3(0, -1, 0)),
+        glm::lookAt(glm::vec3(0), glm::vec3(-1, 0, 0), glm::vec3(0, -1, 0)),
+        glm::lookAt(glm::vec3(0), glm::vec3(0, 1, 0), glm::vec3(0, 0, 1)),
+        glm::lookAt(glm::vec3(0), glm::vec3(0, -1, 0), glm::vec3(0, 0, -1)),
+        glm::lookAt(glm::vec3(0), glm::vec3(0, 0, 1), glm::vec3(0, -1, 0)),
+        glm::lookAt(glm::vec3(0), glm::vec3(0, 0, -1), glm::vec3(0, -1, 0))
+    };
+
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
+
+    for (u32 mip = 0; mip < MAX_MIP_LEVELS; ++mip)
+    {
+        u32 mipSize = PREFILTERED_RES >> mip;
+        glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipSize, mipSize);
+        glViewport(0, 0, mipSize, mipSize);
+
+        float roughness = (float)mip / (float)(MAX_MIP_LEVELS - 1);
+        glUniform1f(glGetUniformLocation(prefilterShader.handle, "roughness"), roughness);
+
+        GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if (status != GL_FRAMEBUFFER_COMPLETE) {
+            ELOG("Framebuffer incompleto en mip %u!", mip);
+        }
+
+        for (u32 i = 0; i < 6; ++i)
+        {
+            glUniformMatrix4fv(glGetUniformLocation(prefilterShader.handle, "view"), 1, GL_FALSE, glm::value_ptr(views[i]));
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, app->prefilteredMap, mip);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            RenderCube();
+        }
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteRenderbuffers(1, &rbo);
 }
 
 GLuint CreateCubeVAO()
@@ -406,6 +549,76 @@ GLuint CreateCubeVAO()
 
     return cubeVAO;
 }
+
+void CreateSphereVAO(GLuint& vao, GLuint& vbo, GLuint& ibo, u32& indexCount, int sectorCount = 64, int stackCount = 32)
+{
+    std::vector<float> vertices;
+    std::vector<u32> indices;
+
+
+    for (int i = 0; i <= stackCount; ++i)
+    {
+        float stackAngle = PI / 2 - i * PI / stackCount;  // from pi/2 to -pi/2
+        float xy = cos(stackAngle);
+        float z = sin(stackAngle);
+
+        for (int j = 0; j <= sectorCount; ++j)
+        {
+            float sectorAngle = j * 2 * PI / sectorCount;
+
+            float x = xy * cos(sectorAngle);
+            float y = xy * sin(sectorAngle);
+
+            vertices.push_back(x); vertices.push_back(y); vertices.push_back(z);   // Position
+            vertices.push_back(x); vertices.push_back(y); vertices.push_back(z);   // Normal
+        }
+    }
+
+    for (int i = 0; i < stackCount; ++i)
+    {
+        int k1 = i * (sectorCount + 1);
+        int k2 = k1 + sectorCount + 1;
+
+        for (int j = 0; j < sectorCount; ++j, ++k1, ++k2)
+        {
+            if (i != 0) {
+                indices.push_back(k1);
+                indices.push_back(k2);
+                indices.push_back(k1 + 1);
+            }
+            if (i != (stackCount - 1)) {
+                indices.push_back(k1 + 1);
+                indices.push_back(k2);
+                indices.push_back(k2 + 1);
+            }
+        }
+    }
+
+    indexCount = static_cast<u32>(indices.size());
+
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ibo);
+
+    glBindVertexArray(vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(u32), indices.data(), GL_STATIC_DRAW);
+
+    // Position attribute
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+
+    // Normal attribute
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    glBindVertexArray(0);
+}
+
 
 void CreateCubeVAO(GLuint& vao, GLuint& vbo, GLuint& ibo, u32& indexCount)
 {
@@ -516,7 +729,12 @@ void Init(App* app)
     app->foamMap = LoadTexture2D(app, "Water/foamMap.png");
     app->causticsMap = LoadTexture2D(app, "Water/causticsmap.jpg");
 
-    app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloppenheim_02_puresky_4k.hdr");
+    app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
+   
+
+    
+
+    
 
     // Verificar contenido del cubemap
     glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
@@ -524,6 +742,16 @@ void Init(App* app)
     glGetTexLevelParameteriv(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, GL_TEXTURE_WIDTH, &w);
     std::cout << "[DEBUG] Cubemap face width: " << w << std::endl;
 
+    
+    Model& model = app->models[app->sphereModelIdx];
+    Mesh& mesh = app->meshes[model.meshIdx];
+
+    if (mesh.submeshes.empty()) {
+        std::cout << "[ERROR] El modelo de esfera no contiene submeshes\n";
+    }
+    else {
+        std::cout << "[DEBUG] Submeshes encontrados: " << mesh.submeshes.size() << std::endl;
+    }
     //Scene 1
     app->BaseIdx = LoadModel(app, "Rocks/Base.obj");
     app->SculptIdx = LoadModel(app, "Rocks/Sculpt.obj");
@@ -539,6 +767,9 @@ void Init(App* app)
     app->StoneIdx  =LoadModel(app, "Island/Stone.obj");
 
     app->SkyBoxIdx = LoadProgram(app, "SKYBOX.glsl", "SKYBOX");
+    app->irradianceConvolutionProgramIdx = LoadProgram(app, "IBL_CONVOLUTION.glsl", "IBL_CONVOLUTION");
+    app->irradianceDebugProgramIdx = LoadProgram(app, "IRRADIANCE_DEBUG.glsl", "IRRADIANCE_DEBUG");
+    app->prefilterConvolutionProgramIdx = LoadProgram(app, "PREFILTER_CONVOLUTION.glsl", "PREFILTER_CONVOLUTION");
 
     app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", "RENDER_GEOMETRY_DEFERRED");
     app->ModelTextureUniform = glGetUniformLocation(app->programs[app->geometryProgramIdx].handle, "uTexture");
@@ -547,9 +778,15 @@ void Init(App* app)
     app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", "WATER_EFFECT_DEFERRED");
     app->refractionProgramIdx = LoadProgram(app, "ENV_REFRACTION.glsl", "ENV_REFRACTION");
     app->reflectionProgramIdx = LoadProgram(app, "ENV_REFLECTION.glsl", "ENV_REFLECTION");
+    app->iblCombinedProgramIdx = LoadProgram(app, "IBL_COMBINED.glsl", "IBL_COMBINED");
 
     CreateCubeVAO(app->vaoRefractionCube, app->vboRefractionCube, app->iboRefractionCube, app->refractionCubeIndexCount);
-    
+    CreateSphereVAO(app->vaoSphere, app->vboSphere, app->iboSphere, app->indexCountSphere);
+    CreateIrradianceMap(app);
+    CreatePrefilteredMap(app);
+
+    app->skyboxMap = app->irradianceMap;
+
     //Camera
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
     
@@ -566,7 +803,7 @@ void Init(App* app)
     app->globalUBO = CreateConstantBuffer(app->maxUniformBufferSize);
     app->entityUBO = CreateConstantBuffer(app->maxUniformBufferSize);
 
-    app->currentScene = Scene_Rocks;
+    app->currentScene = Scene_Island;
 
 
     // Luces para Rocks
@@ -584,12 +821,13 @@ void Init(App* app)
     CreateEntity(app, app->BaseIdx, VP, vec3(0));
     CreateEntity(app, app->SculptIdx, VP, vec3(0));
     CreateEntity(app, app->waterModelIdx, VP, vec3(0));
+    
 
     // Actualizar buffers
     UnmapBuffer(app->entityUBO);
     UpdateLights(app);
 
-    app->mode = Mode_Deferred_Geometry;
+    app->mode = Mode_Forward_Geometry;
     app->primaryFBO.CreateFBO(4, app->displaySize.x, app->displaySize.y);
 
     app->reflectionFBO.CreateFBO(1, app->displaySize.x, app->displaySize.y);
@@ -648,6 +886,8 @@ void Gui(App* app)
         if (app->currentScene == Scene_Rocks)
         {
             app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
+            CreateIrradianceMap(app);
+            CreatePrefilteredMap(app);
 
             // Cambiar a escena Island
             app->currentScene = Scene_Island;
@@ -670,6 +910,8 @@ void Gui(App* app)
         else
         {
             app->skyboxMap = ConvertHDRIToCubemap(app, "Skybox/kloppenheim_02_puresky_4k.hdr");
+            CreateIrradianceMap(app);
+            CreatePrefilteredMap(app);
 
             // Cambiar a escena Rocks
             app->currentScene = Scene_Rocks;
@@ -714,8 +956,12 @@ void Gui(App* app)
         app->texturedGeometryProgramIdx = LoadProgram(app, "RENDER_QUAD.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_QUAD_DEFERRED" : "RENDER_QUAD_FORWARD");
         app->geometryProgramIdx = LoadProgram(app, "RENDER_GEOMETRY.glsl", app->mode == Mode_Deferred_Geometry ? "RENDER_GEOMETRY_DEFERRED" : "RENDER_GEOMETRY_FORWARD");
         app->waterProgramIdx = LoadProgram(app, "WATER_EFFECT.glsl", app->mode == Mode_Deferred_Geometry ? "WATER_EFFECT_DEFERRED" : "WATER_EFFECT_FORWARD");
+        app->iblCombinedProgramIdx = LoadProgram(app, "IBL_COMBINED.glsl", "IBL_COMBINED");
        
         app->SkyBoxIdx = LoadProgram(app, "SKYBOX.glsl", "SKYBOX");
+        app->irradianceDebugProgramIdx = LoadProgram(app, "IRRADIANCE_DEBUG.glsl", "IRRADIANCE_DEBUG");
+        app->irradianceConvolutionProgramIdx = LoadProgram(app, "IBL_CONVOLUTION.glsl", "IBL_CONVOLUTION");
+        app->prefilterConvolutionProgramIdx = LoadProgram(app, "PREFILTER_CONVOLUTION.glsl", "PREFILTER_CONVOLUTION");
 
             
         //app->refractionProgramIdx = LoadProgram(app, "ENV_REFRACTION.glsl", "ENV_REFRACTION");
@@ -1072,6 +1318,33 @@ void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane)
     glUseProgram(0);
 }
 
+void RenderIrradianceDebugCube(App* app)
+{
+    Program& debugProgram = app->programs[app->irradianceDebugProgramIdx]; // Asegúrate de cargarlo
+    glUseProgram(debugProgram.handle);
+
+    // Remover la traslación de la vista
+    glm::mat4 view = glm::mat4(glm::mat3(app->worldCamera.ViewMatrix));
+    glm::mat4 proj = app->worldCamera.ProjectionMatrix;
+
+    glUniformMatrix4fv(glGetUniformLocation(debugProgram.handle, "view"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(debugProgram.handle, "projection"), 1, GL_FALSE, glm::value_ptr(proj));
+
+    // Irradiance cubemap
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->irradianceMap);
+    glUniform1i(glGetUniformLocation(debugProgram.handle, "irradianceMap"), 0);
+
+    glDepthFunc(GL_LEQUAL);
+    glBindVertexArray(app->SkyBoxVao);  // Puedes usar tu mismo cubo de skybox
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
+    glDepthFunc(GL_LESS);
+
+    glUseProgram(0);
+}
+
+
 
 void RenderWater(App* app)
 {
@@ -1196,55 +1469,101 @@ void RenderSkybox(App* app, const glm::mat4& viewMatrix, const glm::mat4& projec
     glUseProgram(0);
 }
 
-//void RenderGlassCube(App* app, const glm::mat4& modelMatrix)
-//{
-//    Program& refractionProgram = app->programs[app->refractionProgramIdx];
-//    glUseProgram(refractionProgram.handle);
-//
-//    // Matrices
-//    glUniformMatrix4fv(glGetUniformLocation(refractionProgram.handle, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
-//    glUniformMatrix4fv(glGetUniformLocation(refractionProgram.handle, "uView"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ViewMatrix));
-//    glUniformMatrix4fv(glGetUniformLocation(refractionProgram.handle, "uProjection"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ProjectionMatrix));
-//
-//    // Cámara
-//    glUniform3fv(glGetUniformLocation(refractionProgram.handle, "uCameraPosition"), 1, glm::value_ptr(app->worldCamera.Position));
-//
-//    // Skybox
-//    glActiveTexture(GL_TEXTURE0);
-//    glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
-//    glUniform1i(glGetUniformLocation(refractionProgram.handle, "skybox"), 0);
-//
-//    // Opcional: índice de refracción
-//    glUniform1f(glGetUniformLocation(refractionProgram.handle, "refractRatio"), 1.0f / 1.52f);
-//
-//    // Dibujar cubo (suponiendo que lo tienes cargado)
-//    glBindVertexArray(app->vaoRefractionCube);
-//    glDrawElements(GL_TRIANGLES, app->refractionCubeIndexCount, GL_UNSIGNED_INT, 0);
-//
-//    glBindVertexArray(0);
-//    glUseProgram(0);
-//}
-//
-//void RenderReflectiveCube(App* app, const glm::mat4& modelMatrix)
-//{
-//    Program& reflectionProgram = app->programs[app->reflectionProgramIdx];
-//    glUseProgram(reflectionProgram.handle);
-//
-//    glUniformMatrix4fv(glGetUniformLocation(reflectionProgram.handle, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
-//    glUniformMatrix4fv(glGetUniformLocation(reflectionProgram.handle, "uView"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ViewMatrix));
-//    glUniformMatrix4fv(glGetUniformLocation(reflectionProgram.handle, "uProjection"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ProjectionMatrix));
-//    glUniform3fv(glGetUniformLocation(reflectionProgram.handle, "uCameraPosition"), 1, glm::value_ptr(app->worldCamera.Position));
-//
-//    glActiveTexture(GL_TEXTURE0);
-//    glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
-//    glUniform1i(glGetUniformLocation(reflectionProgram.handle, "skybox"), 0);
-//
-//    glBindVertexArray(app->vaoRefractionCube);
-//    glDrawElements(GL_TRIANGLES, app->refractionCubeIndexCount, GL_UNSIGNED_INT, 0);
-//
-//    glBindVertexArray(0);
-//    glUseProgram(0);
-//}
+void RenderSphereIBL(App* app)
+{
+    Program& iblProgram = app->programs[app->iblCombinedProgramIdx];
+    glUseProgram(iblProgram.handle);
+
+    // Matrices
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0, 10, 0)); // Posición de la esfera
+    glUniformMatrix4fv(glGetUniformLocation(iblProgram.handle, "uModel"), 1, GL_FALSE, glm::value_ptr(model));
+    glUniformMatrix4fv(glGetUniformLocation(iblProgram.handle, "uView"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ViewMatrix));
+    glUniformMatrix4fv(glGetUniformLocation(iblProgram.handle, "uProjection"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ProjectionMatrix));
+    glUniform3fv(glGetUniformLocation(iblProgram.handle, "uCameraPosition"), 1, glm::value_ptr(app->worldCamera.Position));
+
+    // Bind global UBO
+    glBindBufferRange(GL_UNIFORM_BUFFER, 0, app->globalUBO.handle, 0, app->globalUBO.size);
+
+    // Texturas IBL
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->irradianceMap);
+    glUniform1i(glGetUniformLocation(iblProgram.handle, "irradianceMap"), 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap); // o prefilteredMap si usas reflexión especular
+    glUniform1i(glGetUniformLocation(iblProgram.handle, "skyboxMap"), 1);
+
+    // Uniforms opcionales
+    glUniform1f(glGetUniformLocation(iblProgram.handle, "reflectionStrength"), 0.5f);
+    glUniform3f(glGetUniformLocation(iblProgram.handle, "baseColor"), 1.0f, 1.0f, 1.0f);
+
+    // Dibujar esfera
+    glBindVertexArray(app->vaoSphere);
+    glDrawElements(GL_TRIANGLES, app->indexCountSphere, GL_UNSIGNED_INT, 0);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+
+
+void RenderCube()
+{
+    static GLuint cubeVAO = CreateCubeVAO(); // o guarda en App*
+    glBindVertexArray(cubeVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
+}
+
+void RenderGlassCube(App* app, const glm::mat4& modelMatrix)
+{
+    Program& refractionProgram = app->programs[app->refractionProgramIdx];
+    glUseProgram(refractionProgram.handle);
+
+    // Matrices
+    glUniformMatrix4fv(glGetUniformLocation(refractionProgram.handle, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
+    glUniformMatrix4fv(glGetUniformLocation(refractionProgram.handle, "uView"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ViewMatrix));
+    glUniformMatrix4fv(glGetUniformLocation(refractionProgram.handle, "uProjection"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ProjectionMatrix));
+
+    // Cámara
+    glUniform3fv(glGetUniformLocation(refractionProgram.handle, "uCameraPosition"), 1, glm::value_ptr(app->worldCamera.Position));
+
+    // Skybox
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
+    glUniform1i(glGetUniformLocation(refractionProgram.handle, "skybox"), 0);
+
+    // Opcional: índice de refracción
+    glUniform1f(glGetUniformLocation(refractionProgram.handle, "refractRatio"), 1.0f / 1.52f);
+
+    // Dibujar cubo (suponiendo que lo tienes cargado)
+    glBindVertexArray(app->vaoRefractionCube);
+    glDrawElements(GL_TRIANGLES, app->refractionCubeIndexCount, GL_UNSIGNED_INT, 0);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+void RenderReflectiveCube(App* app, const glm::mat4& modelMatrix)
+{
+    Program& reflectionProgram = app->programs[app->reflectionProgramIdx];
+    glUseProgram(reflectionProgram.handle);
+
+    glUniformMatrix4fv(glGetUniformLocation(reflectionProgram.handle, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
+    glUniformMatrix4fv(glGetUniformLocation(reflectionProgram.handle, "uView"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ViewMatrix));
+    glUniformMatrix4fv(glGetUniformLocation(reflectionProgram.handle, "uProjection"), 1, GL_FALSE, glm::value_ptr(app->worldCamera.ProjectionMatrix));
+    glUniform3fv(glGetUniformLocation(reflectionProgram.handle, "uCameraPosition"), 1, glm::value_ptr(app->worldCamera.Position));
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app->skyboxMap);
+    glUniform1i(glGetUniformLocation(reflectionProgram.handle, "skybox"), 0);
+
+    glBindVertexArray(app->vaoRefractionCube);
+    glDrawElements(GL_TRIANGLES, app->refractionCubeIndexCount, GL_UNSIGNED_INT, 0);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
 
 void Render(App* app)
 {
@@ -1318,7 +1637,8 @@ void Render(App* app)
             glm::mat4 refractionVP = app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix;
             UpdateEntitiesWithVP(app, refractionVP);
             RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 0)); // Plano de recorte para refracción
-            RenderSkybox(app, app->worldCamera.ViewMatrix, app->worldCamera.ProjectionMatrix);
+            //RenderIrradianceDebugCube(app);
+         
 
             // 3. Renderizar escena principal
             glBindFramebuffer(GL_FRAMEBUFFER, app->primaryFBO.handle);
@@ -1332,6 +1652,8 @@ void Render(App* app)
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
 
+            RenderSphereIBL(app);
+
             //glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0, 10, 0));
             //RenderGlassCube(app, modelMatrix);
 
@@ -1342,6 +1664,8 @@ void Render(App* app)
             RenderWater(app);
 
             RenderSkybox(app, app->worldCamera.ViewMatrix, app->worldCamera.ProjectionMatrix);
+           // RenderIrradianceDebugCube(app);
+           
 
         }
         break;
@@ -1372,19 +1696,20 @@ void Render(App* app)
                 textures.push_back(it.second);
             glDrawBuffers(textures.size(), textures.data());
 
-            
-            RenderSkybox(app, app->worldCamera.ViewMatrix, app->worldCamera.ProjectionMatrix);
+            //RenderIrradianceDebugCube(app);
+            //RenderSkybox(app, app->worldCamera.ViewMatrix, app->worldCamera.ProjectionMatrix);
 
             // Renderizar escena
             UpdateEntitiesWithVP(app, app->worldCamera.ProjectionMatrix * app->worldCamera.ViewMatrix);
             RenderSceneWithClipPlane(app, glm::vec4(0, -1, 0, 100.0));
             RenderWater(app);
+            RenderSphereIBL(app);
 
-            /*glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0, 10, 0));
-            RenderGlassCube(app, modelMatrix);
+            //glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0, 10, 0));
+            //RenderGlassCube(app, modelMatrix);
 
-            modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(10.0f, 10.f, 0.0f));
-            RenderReflectiveCube(app, modelMatrix);*/
+            //modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(10.0f, 10.f, 0.0f));
+            //RenderReflectiveCube(app, modelMatrix);
 
             // 4. Final: compositar quad con G-Buffers
            glBindFramebuffer(GL_FRAMEBUFFER, 0);

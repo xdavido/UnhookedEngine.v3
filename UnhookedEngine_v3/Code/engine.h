@@ -38,6 +38,8 @@ void RenderWater(App* app);
 
 void RenderSkybox(App* app, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
 
+void RenderCube();
+
 void RenderSceneWithClipPlane(App* app, const glm::vec4& clipPlane);
 
 u32 ConvertHDRIToCubemap(App* app, const char* filepath);

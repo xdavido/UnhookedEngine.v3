@@ -130,5 +130,17 @@
     <None Include="WorkingDir\ENV_REFLECTION.glsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="WorkingDir\IBL_COMBINED.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="WorkingDir\IRRADIANCE_DEBUG.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="WorkingDir\IBL_CONVOLUTION.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="WorkingDir\PREFILTER_CONVOLUTION.glsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

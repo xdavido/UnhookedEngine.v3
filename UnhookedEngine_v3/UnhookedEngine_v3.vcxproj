@@ -55,6 +55,10 @@
     <None Include="WorkingDir\ENV_REFLECTION.glsl" />
     <None Include="WorkingDir\ENV_REFRACTION.glsl" />
     <None Include="WorkingDir\EQUIRECT_TO_CUBEMAP.glsl" />
+    <None Include="WorkingDir\IBL_COMBINED.glsl" />
+    <None Include="WorkingDir\IBL_CONVOLUTION.glsl" />
+    <None Include="WorkingDir\IRRADIANCE_DEBUG.glsl" />
+    <None Include="WorkingDir\PREFILTER_CONVOLUTION.glsl" />
     <None Include="WorkingDir\RENDER_GEOMETRY.glsl" />
     <None Include="WorkingDir\RENDER_QUAD.glsl" />
     <None Include="WorkingDir\SKYBOX.glsl" />

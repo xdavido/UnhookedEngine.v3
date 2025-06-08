@@ -14,28 +14,44 @@
 
     #endif
 
-    #ifdef FRAGMENT
+#ifdef FRAGMENT
 
-    in vec3 localPos;
-    out vec4 FragColor;
+in vec3 localPos;
+out vec4 FragColor;
 
-    uniform sampler2D equirectangularMap;
-    const vec2 invAtan = vec2(0.1591, 0.3183);
+uniform sampler2D equirectangularMap;
+const vec2 invAtan = vec2(0.1591, 0.3183);
 
-    vec2 SampleSphericalMap(vec3 v) {
-        vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
-        uv *= invAtan;
-        uv += 0.5;
-        return uv;
-    }
+// Tone mapping parameters
+uniform float exposure = 2.5;
 
-    void main() {
-        vec3 dir = normalize(localPos);
-        vec2 uv = SampleSphericalMap(dir);
-        vec3 color = texture(equirectangularMap, uv).rgb;
-        FragColor = vec4(color, 1.0);
-    }
+vec2 SampleSphericalMap(vec3 v) {
+    vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
+    uv *= invAtan;
+    uv += 0.5;
+    return uv;
+}
 
-    #endif
+// Simple exponential tone mapping
+vec3 ToneMap(vec3 color) {
+    // Exposure tone mapping
+    color = vec3(1.0) - exp(-color * exposure);
+
+    // Gamma correction (assuming gamma 2.2)
+    color = pow(color, vec3(1.5 / 1.));
+
+    return color;
+}
+
+void main() {
+    vec3 dir = normalize(localPos);
+    vec2 uv = SampleSphericalMap(dir);
+    vec3 hdrColor = texture(equirectangularMap, uv).rgb;
+
+    vec3 toneMapped = ToneMap(hdrColor);
+    FragColor = vec4(toneMapped, 1.0);
+}
+
+#endif
 #endif
 
