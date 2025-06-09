@@ -59,6 +59,9 @@ Se ha implementado un shader de agua avanzado (WATER_EFFECT.glsl) aplicable a cu
 
 ![water](UnhookedEngine_v3/WorkingDir/Screenshots/waterSS.png)
 
+![water1](UnhookedEngine_v3/WorkingDir/Screenshots/SS1.png)
+![water2](UnhookedEngine_v3/WorkingDir/Screenshots/SS2.png)
+
 ### 🌐 Environment Mapping  
 #### Autor: Xiao Shan Costajussa  
 
